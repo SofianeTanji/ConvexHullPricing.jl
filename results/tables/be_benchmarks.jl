@@ -3,7 +3,7 @@ using ConvexHullPricing, DataFrames, JLD2, ProgressBars
 
 @info "Loading instances ..."
 list_of_instances = []
-for file in readdir("C:\\Users\\Sofiane\\Desktop\\ConvexHullPricing\\belgian_data"; join=true)
+for file in readdir("\\data\\belgian"; join=true)
     push!(list_of_instances, ConvexHullPricing.Utilitaries.load_data(file))
 end
 @info "BE instances are loaded !"
