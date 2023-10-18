@@ -1,10 +1,12 @@
 using Revise
 using ConvexHullPricing, DataFrames, JLD2, ProgressBars
 
+@info "Loading instances ..."
 list_of_instances = []
 for file in readdir("C:\\Users\\Sofiane\\Desktop\\ConvexHullPricing\\ca_data"; join=true)
     push!(list_of_instances, ConvexHullPricing.Utilitaries.load_data(file))
 end
+@info "CA instances are loaded !"
 
 function init()
     BLMdf = DataFrame(
@@ -63,6 +65,7 @@ function init()
     return BLMdf, BPMdf, DAdf, DowGdf, Polyakdf
 end
 function benchmark(instance, opt)
+    @info "Computing initial iterate"
     LP_Relax = ConvexHullPricing.Utilitaries.LP_Relaxation(instance)
     push!(BLMdf.instance, instance)
     push!(BPMdf.instance, instance)
@@ -70,6 +73,7 @@ function benchmark(instance, opt)
     push!(DowGdf.instance, instance)
     push!(Polyakdf.instance, instance)
     
+    @info "Running the BLM method"
     ((iter, iterf, oracle_time, solve_time), runtime) = @timed ConvexHullPricing.Optimizer.tBLM(instance, opt, LP_Relax)
     relgap = abs(abs(last(iterf)) - abs(opt))/maximum([abs(last(iterf)), abs(opt)])
     push!(BLMdf.niter, length(iter))
@@ -80,6 +84,7 @@ function benchmark(instance, opt)
     push!(BLMdf.iterates, iter)
     push!(BLMdf.fiterates, iterf)
 
+    @info "Running the BPM method"
     ((iter, iterf, oracle_time, solve_time), runtime) = @timed ConvexHullPricing.Optimizer.tBPM(instance, -opt, LP_Relax)
     relgap = abs(abs(last(iterf)) - abs(opt))/maximum([abs(last(iterf)), abs(opt)])
     push!(BPMdf.niter, length(iter))
@@ -90,6 +95,7 @@ function benchmark(instance, opt)
     push!(BPMdf.iterates, iter)
     push!(BPMdf.fiterates, iterf)
 
+    @info "Running the DAdaptation method"
     ((iter, iterf, oracle_time, solve_time), runtime) = @timed ConvexHullPricing.Optimizer.tDA(instance, opt, LP_Relax)
     relgap = abs(abs(last(iterf)) - abs(opt))/maximum([abs(last(iterf)), abs(opt)])
     push!(DAdf.niter, length(iter))
@@ -100,6 +106,7 @@ function benchmark(instance, opt)
     push!(DAdf.iterates, iter)
     push!(DAdf.fiterates, iterf)
 
+    @info "Running the DowG method"
     ((iter, iterf, oracle_time, solve_time), runtime) = @timed ConvexHullPricing.Optimizer.tDoWG(instance, opt, LP_Relax)
     relgap = abs(abs(last(iterf)) - abs(opt))/maximum([abs(last(iterf)), abs(opt)])
     push!(DowGdf.niter, length(iter))
@@ -110,6 +117,7 @@ function benchmark(instance, opt)
     push!(DowGdf.iterates, iter)
     push!(DowGdf.fiterates, iterf)
 
+    @info "Running the Polyak method"
     ((iter, iterf, oracle_time, solve_time), runtime) = @timed ConvexHullPricing.Optimizer.tPolyak(instance, opt, LP_Relax)
     relgap = abs(abs(last(iterf)) - abs(opt))/maximum([abs(last(iterf)), abs(opt)])
     push!(Polyakdf.niter, length(iter))
@@ -121,23 +129,31 @@ function benchmark(instance, opt)
     push!(Polyakdf.fiterates, iterf)
 end
 
-
 BLMdf, BPMdf, DAdf, DowGdf, Polyakdf = init()
-optimals = load_object("results//tables//OptimalDF")
+@info "Dataframes for each method are ready to be filled !"
+
+optimals = load_object("results//tables//caOptimalDF.jld2")
+
+@info "Optimal values of each instance loaded."
+
+@info "Running benchmarks for each method."
+@info "Max iter = 500. Good hyperparameters guessed but not optimized."
 for (i, instance) in tqdm(enumerate(list_of_instances))
     opt = last(optimals[i,:].fiterates)
     benchmark(instance, opt)
 end
+@info "Benchmarks done !"
 
-BLMdf
-BPMdf
-DAdf
-DowGdf
-Polyakdf
+@show BLMdf
+@show BPMdf
+@show DAdf
+@show DowGdf
+@show Polyakdf
+
 save_object("results//tables//caBLMdf.jld2", BLMdf)
 save_object("results//tables//caBPMdf.jld2", BPMdf)
 save_object("results//tables//caDAdf.jld2", DAdf)
 save_object("results//tables//caDowGdf.jld2", DowGdf)
 save_object("results//tables//caPolyakdf.jld2", Polyakdf)
 
-println("Done !!")
+println("Everything is done !!")

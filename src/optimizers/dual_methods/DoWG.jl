@@ -20,7 +20,7 @@ function DoWG(instance, initial_prices, niter, initial_distance_estimate)
     return x_best, iterates, fun_iterates
 end
 
-function tDoWG(instance, opt, initial_prices, initial_distance_estimate=1e3, eps=1e-5)
+function tDoWG(instance, opt, initial_prices, initial_distance_estimate=1e3, eps=1e-6)
     list_V = [0.]
     list_R = [initial_distance_estimate]
     iterates = [initial_prices]

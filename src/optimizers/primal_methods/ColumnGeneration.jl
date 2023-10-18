@@ -1,7 +1,7 @@
 # Implementation of Dantzig-Wolfe method
 using JuMP, ..Utilitaries, LinearAlgebra, Gurobi
 
-function ColumnGeneration(instance, niter, eps)
+function ColumnGeneration(instance, initial_prices, niter, eps)
 
     # Unzip instance
     MinRunCapacity = instance.ThermalGen.MinRunCapacity
@@ -106,7 +106,7 @@ function ColumnGeneration(instance, niter, eps)
     ## Market Clearing Constraint
     ConstrBalance = @constraint(restricted_model, [t=1:T], sum(sum(sum(DictZ[gen,i] * prod for (time,prod) in enumerate(ScheduleP[gen,i]) if time==t) for i=1:ScheduleCounter[gen]) for gen=1:NbGen) - VarL[t] == 0)
     ConstrConvexComb = @constraint(restricted_model, [gen=1:NbGen], sum(DictZ[gen,i] for i=1:ScheduleCounter[gen]) == 1)
-
+    set_dual_start_value(ConstrBalance, initial_prices)
     RMP = Utilitaries.RestrictedMasterProgram(restricted_model, DictZ, VarL, ConstrBalance, ConstrConvexComb)
 
     ## Run the Dantzig-Wolfe iterations

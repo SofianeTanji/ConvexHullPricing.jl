@@ -26,7 +26,7 @@ function DAdaptation(instance, initial_prices, niter, initial_distance_estimate)
     return final_price, iterates, fun_iterates
 end
 
-function tDA(instance, opt, initial_prices, initial_distance_estimate=1e4, eps=1e-5)
+function tDA(instance, opt, initial_prices, initial_distance_estimate=1e4, eps=1e-6)
     T = length(instance.Load)
     iterates = [initial_prices]
     fun_oracle, grad_oracle = Utilitaries.fast_oracle(instance, iterates[1])

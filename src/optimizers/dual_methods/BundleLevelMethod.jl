@@ -90,7 +90,7 @@ function GetOptimal(instance, initial_prices, itermax = 100, RelativeGap = 1e-7,
     return last(iterates), iterates, fun_iterates, RelGap
 end
 
-function tBLM(instance, opt, initial_prices, alpha = .7, eps=1e-5)
+function tBLM(instance, opt, initial_prices, alpha = .7, eps=1e-6)
     T = length(instance.Load)
     iterates = [initial_prices]
     fun_iterates = Array([])

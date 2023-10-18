@@ -17,7 +17,7 @@ function PolyakMethod(instance, initial_prices, niter, ObjSol)
     return last(iterates), iterates, fun_iterates
 end
 
-function tPolyak(instance, opt, initial_prices, eps=1e-5)
+function tPolyak(instance, opt, initial_prices, eps=1e-6)
     iterates = [initial_prices]
     fun_iterates = Array([])
     oracle_time = 0

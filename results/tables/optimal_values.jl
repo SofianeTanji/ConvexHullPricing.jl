@@ -5,12 +5,12 @@ df = DataFrame(
     iterates = [],
     fiterates = []
 )
-@info "Here we go !"
+@info "Loading instances ..."
 list_of_instances = []
 for file in readdir("C:\\Users\\Sofiane\\Desktop\\ConvexHullPricing\\ca_data"; join=true)
     push!(list_of_instances, ConvexHullPricing.Utilitaries.load_data(file))
 end
-@info "Here we go !"
+@info "CA instances loaded !"
 for (i, instance) in tqdm(enumerate(list_of_instances))
     push!(df.instance, instance)
     LP_Relax = ConvexHullPricing.Utilitaries.LP_Relaxation(instance)
@@ -54,6 +54,7 @@ end
 
 for i=1:8
     @info (bedf.relgap[i])
+    @info (length(bedf.iterates[i]))
 end
 
 save_object("results//tables//beOptimalDF.jld2", bedf)
