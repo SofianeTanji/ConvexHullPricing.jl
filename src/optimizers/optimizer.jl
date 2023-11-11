@@ -3,8 +3,9 @@ module Optimizer
     using LinearAlgebra, Gurobi
     
     # As per current European Market Rules
-    const PriceCapUp = 300
-    const PriceCapDown = -50
+    const PCU = 3000
+    const PCD = -500
+    const PC = abs(PCU) + abs(PCD)
     
     const GRB_ENV = Ref{Gurobi.Env}()
 

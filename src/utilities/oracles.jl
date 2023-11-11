@@ -1,5 +1,5 @@
 # Implementation of defined oracles in (Tanji et al., 2023)
-using JuMP, Gurobi, LinearAlgebra
+using JuMP, Gurobi, LinearAlgebra, Random
 
 function Matching(instance)
     MinRunCapacity = instance.ThermalGen.MinRunCapacity
@@ -318,6 +318,61 @@ function fast_oracle(instance, prices)
     ObjOracle = 0
     GradOracle = zeros(T)
     for gen=1:NbGen
+        model = JuMP.direct_model(Gurobi.Optimizer(GRB_ENV[]))
+        set_silent(model)
+
+        @variable(model, Varp[t=0:T+1], lower_bound = 0)
+        @variable(model, Varpbar[t=0:T+1], lower_bound = 0)
+        @variable(model, Varu[t=0:T+1], Bin)
+        @variable(model, Varv[t=0:T+1], Bin)
+        @variable(model, Varw[t=0:T+1], Bin)
+
+        @variable(model, VarL[t=1:T], lower_bound = 0)
+        @constraint(model, [t=1:T], VarL[t] <= L[t])
+
+        @constraint(model, ConstrLogical[t=1:T+1], Varu[t] - Varu[t - 1] == Varv[t] - Varw[t])
+        @constraint(model, ConstrGenLimits2[t=0:T+1], Varp[t] <= Varpbar[t])
+
+        @constraint(model, ConstrMinUpTime[t=UpTime[gen]:T+1], sum(Varv[i]  for i=t-UpTime[gen]+1:t) <= Varu[t])
+        @constraint(model, ConstrMinDownTime[t=DownTime[gen]:T+1], sum(Varw[i]  for i=t-DownTime[gen]+1:t) <= (1 - Varu[t]))
+        @constraint(model, ConstrGenLimits1[t=0:T+1], MinRunCapacity[gen] * Varu[t] <= Varp[t])
+        @constraint(model, ConstrGenLimits3[t=0:T+1], Varpbar[t] <= MaxRunCapacity[gen] * Varu[t])
+        @constraint(model, ConstrRampUp[t=1:T+1], Varpbar[t] - Varp[t - 1] <= RampUp[gen] * Varu[t - 1] + StartUp[gen] * Varv[t])
+        @constraint(model, ConstrRampDown[t=1:T+1], Varpbar[t - 1] - Varp[t] <= RampDown[gen] * Varu[t] + ShutDown[gen] * Varw[t])
+
+        @objective(model, Min, sum(NoLoadConsumption[gen] * MarginalCost[gen] * Varu[t] + FixedCost[gen] * Varv[t] + MarginalCost[gen] * Varp[t] - (LostLoad / NbGen) * VarL[t] - prices[t] * (Varp[t] - (VarL[t]/NbGen)) for t=1:T))
+        optimize!(model)
+
+        ObjOracle += objective_value(model)
+        ValL = value.(model[:VarL])
+        Valp = value.(model[:Varp])
+        GradOracle += Array([ValL[t]/NbGen - Valp[t] for t=1:T])
+    end
+    return ObjOracle, GradOracle
+end
+
+function stochastic_oracle(instance, prices, batchsize)
+    MinRunCapacity = instance.ThermalGen.MinRunCapacity
+    MaxRunCapacity = instance.ThermalGen.MaxRunCapacity
+    RampUp = instance.ThermalGen.RampUp
+    RampDown = instance.ThermalGen.RampDown
+    UpTime = instance.ThermalGen.UpTime
+    DownTime = instance.ThermalGen.DownTime
+    StartUp = instance.ThermalGen.StartUp
+    ShutDown = instance.ThermalGen.ShutDown
+    NbGen = length(MinRunCapacity)
+    FixedCost = instance.ThermalGen.FixedCost
+    MarginalCost = instance.ThermalGen.MarginalCost
+    NoLoadConsumption = instance.ThermalGen.NoLoadConsumption
+    L = instance.Load
+    T = length(L)
+    LostLoad = instance.LostLoad
+
+    ObjOracle = 0
+    GradOracle = zeros(T)
+    indexes = randperm(NbGen)[1:batchsize]
+    generators = [k for k in 1:NbGen]
+    for gen in generators[indexes]
         model = JuMP.direct_model(Gurobi.Optimizer(GRB_ENV[]))
         set_silent(model)
 

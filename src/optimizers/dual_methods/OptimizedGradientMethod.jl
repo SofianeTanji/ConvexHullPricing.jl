@@ -1,7 +1,7 @@
 # Implementation of the Optimized Gradient Method (see Kim et al., 2016)
 using ..Utilitaries, LinearAlgebra
 
-function OptimizedGradientMethod(instance, initial_prices, niter, smoothing_parameter)
+function OptimizedGradientMethod(instance, initial_prices, niter, smoothing_parameter, verbose = -1)
     T = length(instance.Load)
     NbGen = length(instance.ThermalGen.MinRunCapacity)
     Lips = ((1 + 1 / (NbGen^2)) * T)/smoothing_parameter
@@ -10,6 +10,9 @@ function OptimizedGradientMethod(instance, initial_prices, niter, smoothing_para
     Thetas = [1.]
     fun_iterates = Array([])
     for t=1:niter
+        if verbose > 0
+            @info "[OGM: Iteration $t]"
+        end    
         fun_oracle, grad_oracle = Utilitaries.smooth_oracle(instance, y_iterates[t], smoothing_parameter)
         push!(fun_iterates, fun_oracle)
         # fun_oracle, grad_oracle = - fun_oracle, - grad_oracle # Maximizing a concave function <=> Minimizing a convex function
