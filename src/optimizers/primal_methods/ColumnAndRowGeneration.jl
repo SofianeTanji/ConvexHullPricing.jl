@@ -258,7 +258,7 @@ function ColumnAndRowGeneration(instance, niter, eps)
 	# Solving Matching problem, get Intervals
 	model = JuMP.direct_model(Gurobi.Optimizer(GRB_ENV[]))
     set_silent(model)
-
+	set_optimizer_attribute(model, "Threads", 8)
 	@variable(model, Varp[g=1:NbGen, t=0:T+1], lower_bound = 0)
     @variable(model, Varpbar[g=1:NbGen, t=0:T+1], lower_bound = 0)
     @variable(model, Varu[g=1:NbGen, t=0:T+1], Bin)
@@ -305,7 +305,7 @@ function ColumnAndRowGeneration(instance, niter, eps)
 	# Restricted model
 	RestrictedModel = JuMP.direct_model(Gurobi.Optimizer(GRB_ENV[]))
     set_silent(RestrictedModel)
-
+	set_optimizer_attribute(RestrictedModel, "Threads", 8)
 	@variable(RestrictedModel, 0 <= Varp[g=1:NbGen, i=1:addedNbIntervals[g], t=0:T+1])
 	@variable(RestrictedModel, 0 <= Varpbar[g=1:NbGen, i=1:addedNbIntervals[g], t=0:T+1])
 	@variable(RestrictedModel, 0 <= Vargamma[g=1:NbGen, i=1:addedNbIntervals[g]])
@@ -470,4 +470,245 @@ function ColumnAndRowGeneration(instance, niter, eps)
 	end
 
 	return Prices[end], Prices, arrObjPricing
+end
+
+function tColumnAndRowGeneration(instance, budget, eps)
+	# Unzip instance
+    MinRunCapacity = instance.ThermalGen.MinRunCapacity
+    MaxRunCapacity = instance.ThermalGen.MaxRunCapacity
+    RampUp = instance.ThermalGen.RampUp
+    RampDown = instance.ThermalGen.RampDown
+    UpTime = instance.ThermalGen.UpTime
+    DownTime = instance.ThermalGen.DownTime
+    StartUp = instance.ThermalGen.StartUp
+    ShutDown = instance.ThermalGen.ShutDown
+    NbGen = length(MinRunCapacity)
+    FixedCost = instance.ThermalGen.FixedCost
+    MarginalCost = instance.ThermalGen.MarginalCost
+    NoLoadConsumption = instance.ThermalGen.NoLoadConsumption
+    L = instance.Load
+    T = length(L)
+    LostLoad = instance.LostLoad
+
+	# Solving Matching problem, get Intervals
+	model = JuMP.direct_model(Gurobi.Optimizer(GRB_ENV[]))
+    set_silent(model)
+	set_optimizer_attribute(model, "Threads", 8)
+	@variable(model, Varp[g=1:NbGen, t=0:T+1], lower_bound = 0)
+    @variable(model, Varpbar[g=1:NbGen, t=0:T+1], lower_bound = 0)
+    @variable(model, Varu[g=1:NbGen, t=0:T+1], Bin)
+    @variable(model, Varv[g=1:NbGen, t=0:T+1], Bin)
+    @variable(model, Varw[g=1:NbGen, t=0:T+1], Bin)
+
+    @variable(model, VarL[t=1:T], lower_bound = 0)
+    @constraint(model, [t=1:T], VarL[t] <= L[t])
+
+    @constraint(model, loads[t=1:T], sum(Varp[g, t] for g=1:NbGen) == VarL[t]) # Balance constraint
+
+    @constraint(model, ConstrLogical[g=1:NbGen, t=1:T+1], Varu[g, t] - Varu[g, t - 1] == Varv[g, t] - Varw[g, t])
+    @constraint(model, ConstrMinUpTime[g=1:NbGen, t=UpTime[g]:T+1], sum(Varv[g, i]  for i=t-UpTime[g]+1:t) <= Varu[g, t])
+    @constraint(model, ConstrMinDownTime[g=1:NbGen, t=DownTime[g]:T+1], sum(Varw[g, i]  for i=t-DownTime[g]+1:t) <= (1 - Varu[g, t]))
+    @constraint(model, ConstrGenLimits1[g=1:NbGen, t=0:T+1], MinRunCapacity[g] * Varu[g, t] <= Varp[g, t])
+    @constraint(model, ConstrGenLimits2[g=1:NbGen, t=0:T+1], Varp[g, t] <= Varpbar[g, t])
+    @constraint(model, ConstrGenLimits3[g=1:NbGen, t=0:T+1], Varpbar[g, t] <= MaxRunCapacity[g] * Varu[g, t])
+    @constraint(model, ConstrRampUp[g=1:NbGen, t=1:T+1], Varpbar[g, t] - Varp[g, t - 1] <= RampUp[g] * Varu[g,t - 1] + StartUp[g] * Varv[g, t])
+    @constraint(model, ConstrRampDown[g=1:NbGen, t=1:T+1], Varpbar[g, t - 1] - Varp[g, t] <= RampDown[g] * Varu[g, t] + ShutDown[g] * Varw[g, t])
+
+	for g=1:NbGen
+		JuMP.fix(model[:Varu][g,0], 0; force = true)
+		JuMP.fix(model[:Varv][g,0], 0; force = true)
+		JuMP.fix(model[:Varw][g,0], 0; force = true)
+		JuMP.fix(model[:Varp][g,0], 0; force = true)
+		JuMP.fix(model[:Varpbar][g,0], 0; force = true)
+	end
+
+	@objective(model, Min, sum(sum(NoLoadConsumption[g] * MarginalCost[g] * model[:Varu][g, t] + FixedCost[g] * model[:Varv][g, t] + MarginalCost[g] * model[:Varp][g, t] for t=1:T) for g=1:NbGen) - LostLoad * sum(model[:VarL][t] for t=1:T))
+    optimize!(model)
+	MatchingU = value.(model[:Varu]).data
+	delete(model, loads)
+	if NbGen > 1
+		MatchingU = MatchingU[:,2:T+1]
+	else
+		MatchingU = MatchingU[2:T+1]
+	end	
+	(A,B, NbIntervalsGen) = Compute_A_B(MatchingU, NbGen)
+	(A,B, NbIntervalsGen) = set_T(UpTime, T, NbGen)
+	addedA = copy(A)
+	addedB = copy(B)
+	addedNbIntervals = copy(NbIntervalsGen)
+
+	# Restricted model
+	RestrictedModel = JuMP.direct_model(Gurobi.Optimizer(GRB_ENV[]))
+    set_silent(RestrictedModel)
+	set_optimizer_attribute(RestrictedModel, "Threads", 8)
+	@variable(RestrictedModel, 0 <= Varp[g=1:NbGen, i=1:addedNbIntervals[g], t=0:T+1])
+	@variable(RestrictedModel, 0 <= Varpbar[g=1:NbGen, i=1:addedNbIntervals[g], t=0:T+1])
+	@variable(RestrictedModel, 0 <= Vargamma[g=1:NbGen, i=1:addedNbIntervals[g]])
+	@variable(RestrictedModel, 0 <= VarpTime[g=1:NbGen, t=0:T+1])
+	@variable(RestrictedModel, 0 <= VarpbarTime[g=1:NbGen, t=0:T+1])
+	@variable(RestrictedModel, 0 <= Varu[g=1:NbGen, t=0:T+1])
+	@variable(RestrictedModel, 0 <= Varv[g=1:NbGen, t=0:T+1])
+	@variable(RestrictedModel, 0 <= Varw[g=1:NbGen, t=0:T+1])
+	@variable(RestrictedModel, 0 <= VarL[t=1:T])
+	@constraint(RestrictedModel, [t=1:T], VarL[t] <= L[t])
+	@constraint(RestrictedModel, [g=1:NbGen, i=1:addedNbIntervals[g]], Vargamma[g,i] <= 1)
+
+	DictGamma = Dict()
+	DictP = Dict()
+	DictPbar = Dict()
+	
+	for g=1:NbGen
+		for i=1:addedNbIntervals[g]
+			DictGamma[g, i] = RestrictedModel[:Vargamma][g, i]
+			for t=0:T+1
+				DictP[g, i, t] = RestrictedModel[:Varp][g, i, t]
+				DictPbar[g, i, t] = RestrictedModel[:Varpbar][g, i, t]
+			end
+		end
+	end
+
+	CountP = 0
+	CountGamma = 0
+	CountPTime = 0
+	CountU = 0
+	for g=1:NbGen
+		CountPTime += T + 2
+		CountU += T + 2
+		for i=1:addedNbIntervals[g]
+			CountP += T + 2
+			CountGamma += 1
+		end
+	end
+
+	# Feasible Dispatch Polytope
+	@constraint(RestrictedModel, no_production[g=1:NbGen, i=1:addedNbIntervals[g], t=0:T+1; (t<addedA[g,i] || t>addedB[g,i])], DictP[g,i,t] <= 0)
+	@constraint(RestrictedModel, min_output[g=1:NbGen, i=1:addedNbIntervals[g], t=addedA[g,i]:addedB[g,i] ], -DictP[g,i,t] <= -DictGamma[g,i] * MinRunCapacity[g])
+	@constraint(RestrictedModel, max_output[g=1:NbGen, i=1:addedNbIntervals[g], t=addedA[g,i]:addedB[g,i] ], DictP[g,i,t] - DictPbar[g,i,t] <= 0)
+	@constraint(RestrictedModel, upper_bound_on_power_output_1[g=1:NbGen, i=1:addedNbIntervals[g], t=addedA[g,i]:addedB[g,i] ] , DictPbar[g,i,t] <= DictGamma[g,i] * MaxRunCapacity[g])
+	@constraint(RestrictedModel, upper_bound_on_power_output_2[g=1:NbGen, i=1:addedNbIntervals[g], t=addedA[g,i]:addedB[g,i] ] , DictPbar[g,i,t] <= DictGamma[g,i] * (StartUp[g] + (t - addedA[g,i])*RampUp[g] ))
+	@constraint(RestrictedModel, upper_bound_on_power_output_3[g=1:NbGen, i=1:addedNbIntervals[g], t=addedA[g,i]:addedB[g,i] ] , DictPbar[g,i,t] <= DictGamma[g,i] * (ShutDown[g] + (addedB[g,i] - t)*RampDown[g] ))
+	@constraint(RestrictedModel, limit_power_jumps_up_1[g=1:NbGen, i=1:addedNbIntervals[g], t=addedA[g,i]+1:addedB[g,i] ], DictPbar[g,i,t] - DictP[g,i,t-1] <= DictGamma[g,i] * RampUp[g])
+	@constraint(RestrictedModel, limit_power_jumps_up_2[g=1:NbGen, i=1:addedNbIntervals[g], t=addedA[g,i]+1:addedB[g,i] ], DictPbar[g,i,t] - DictP[g,i,t-1] <= DictGamma[g,i] * (ShutDown[g] + (addedB[g,i] - t)*RampDown[g] - MinRunCapacity[g]))
+	@constraint(RestrictedModel, limit_power_jumps_down_1[g=1:NbGen, i=1:addedNbIntervals[g], t=addedA[g,i]+1:addedB[g,i] ], DictPbar[g,i,t-1] - DictP[g,i,t] <= DictGamma[g,i] * RampDown[g])
+	@constraint(RestrictedModel, limit_power_jumps_down_2[g=1:NbGen, i=1:addedNbIntervals[g], t=addedA[g,i]+1:addedB[g,i] ], DictPbar[g,i,t-1] - DictP[g,i,t] <= DictGamma[g,i] * (StartUp[g] + (t - addedA[g,i])*RampUp[g] - MinRunCapacity[g]))
+	@constraint(RestrictedModel, minimum_down_time_constraint[g=1:NbGen, t=1:T], sum(DictGamma[g,i] for i=1:addedNbIntervals[g] if (addedA[g,i] <= t && t <= addedB[g,i]+DownTime[g])) - 1 <= 0)
+	@constraint(RestrictedModel, production_time[g=1:NbGen, t=1:T], VarpTime[g,t] - sum(DictP[g,i,t]  for i=1:addedNbIntervals[g]) == 0)
+	@constraint(RestrictedModel, productionbar_time[g=1:NbGen, t=1:T], VarpbarTime[g,t] - sum(DictPbar[g,i,t]  for i=1:addedNbIntervals[g]) == 0)
+	@constraint(RestrictedModel, commitment_status[g=1:NbGen,t=0:T+1], sum(DictGamma[g,i] for i=1:addedNbIntervals[g] if (addedA[g,i] <= t && t <= addedB[g,i])) - Varu[g,t] == 0)
+	@constraint(RestrictedModel, startup_status[g=1:NbGen, t=0:T+1], sum(DictGamma[g,i]  for i=1:addedNbIntervals[g] if (t == addedA[g,i])) - Varv[g,t] == 0)
+	@constraint(RestrictedModel, shutdown_status[g=1:NbGen, t=0:T+1], sum(DictGamma[g,i] for i=1:addedNbIntervals[g] if (t == addedB[g,i]+1)) - Varw[g,t] == 0)
+	
+	@constraint(RestrictedModel, loads[t=1:T], sum( VarpTime[g,t] for g=1:NbGen) - VarL[t] == 0)
+
+	for g=1:NbGen
+		JuMP.fix(RestrictedModel[:Varu][g,0], 0; force = true)
+		JuMP.fix(RestrictedModel[:Varv][g,0], 0; force = true)
+		JuMP.fix(RestrictedModel[:Varw][g,0], 0; force = true)
+		JuMP.fix(RestrictedModel[:VarpTime][g,0], 0; force = true)
+		JuMP.fix(RestrictedModel[:VarpbarTime][g,0], 0; force = true)
+	end
+
+	@objective(RestrictedModel, Min, sum(sum(NoLoadConsumption[g] * MarginalCost[g] * RestrictedModel[:Varu][g, t] + FixedCost[g] * RestrictedModel[:Varv][g, t] + MarginalCost[g] * RestrictedModel[:VarpTime][g, t] for t=1:T) for g=1:NbGen) - LostLoad * sum(RestrictedModel[:VarL][t] for t=1:T))
+
+	
+	# Start iterations
+	beta = 0
+	arrObjRestricted = []
+	arrObjPricing = []
+	Prices = []
+
+	time_vector = [0.]
+    iter = 1
+    while time_vector[end] <= budget
+		it_time = @elapsed begin
+		# Solve Restricted Problem
+		optimize!(RestrictedModel)
+		ObjRestricted = objective_value(RestrictedModel)
+		Price = dual.(RestrictedModel[:loads])
+		push!(Prices, Price)
+		push!(arrObjRestricted, ObjRestricted)
+		# Solve Pricing Problem
+		@objective(model, Min, sum(sum(NoLoadConsumption[g] * MarginalCost[g] * model[:Varu][g, t] + FixedCost[g] * model[:Varv][g, t] + MarginalCost[g] * model[:Varp][g, t] for t=1:T) for g=1:NbGen) - LostLoad * sum(model[:VarL][t] for t=1:T) - sum(Price[t] * (sum(model[:Varp][g, t] for g=1:NbGen) - model[:VarL][t]) for t=1:T))
+		optimize!(model)
+		ObjPricing = objective_value(model)
+		push!(arrObjPricing, ObjPricing)
+		PricingU = value.(model[:Varu]).data
+
+		if iter == 1
+			beta = ObjPricing
+		else
+			beta = maximum([ObjPricing, beta])
+		end
+
+		if ObjRestricted <= beta + eps
+			break
+		end
+
+		if NbGen > 1
+			U = PricingU[:,2:T+1]
+		else
+			U = PricingU[2:T+1]
+		end
+
+		newA, newB, newNbIntervals, addedA, addedB, addedNbIntervals = Update_A_B(U, NbGen, A, B, NbIntervalsGen)
+
+		A = copy(newA)
+		B = copy(newB)
+		NbIntervalsGen = copy(newNbIntervals)
+
+		# Update variables
+		for g=1:NbGen
+			for i=1:NbIntervalsGen[g] - addedNbIntervals[g]+1:NbIntervalsGen[g]
+				newVarp = @variable(RestrictedModel, [[g], [i], 0:T+1], lower_bound = 0)
+				newVarpbar = @variable(RestrictedModel, [[g], [i], 0:T+1], lower_bound = 0)
+				for t=0:T+1
+					RestrictedModel[:Varp][g, i, t] = newVarp[g, i, t]
+					RestrictedModel[:Varpbar][g, i, t] = newVarpbar[g, i, t]
+				end
+				newVargamma = @variable(RestrictedModel, [[g], [i]], lower_bound = 0)
+				RestrictedModel[:Vargamma][g, i] = newVargamma[g, i] 
+			end
+		end
+
+		# New constraints
+		@constraint(RestrictedModel, [g=1:NbGen, i=NbIntervalsGen[g]-addedNbIntervals[g]+1:NbIntervalsGen[g], t=0:T+1; (t<A[g,i] || t>B[g,i])], RestrictedModel[:Varp][g,i,t] <= 0)
+		@constraint(RestrictedModel, [g=1:NbGen, i=NbIntervalsGen[g]-addedNbIntervals[g]+1:NbIntervalsGen[g], t=A[g,i]:B[g,i] ], -RestrictedModel[:Varp][g,i,t] <= -RestrictedModel[:Vargamma][g,i] * MinRunCapacity[g])
+		@constraint(RestrictedModel, [g=1:NbGen, i=NbIntervalsGen[g]-addedNbIntervals[g]+1:NbIntervalsGen[g], t=A[g,i]:B[g,i] ], RestrictedModel[:Varp][g,i,t] - RestrictedModel[:Varpbar][g,i,t] <= 0)
+		@constraint(RestrictedModel, [g=1:NbGen, i=NbIntervalsGen[g]-addedNbIntervals[g]+1:NbIntervalsGen[g], t=A[g,i]:B[g,i] ] , RestrictedModel[:Varpbar][g,i,t] <= RestrictedModel[:Vargamma][g,i] * MaxRunCapacity[g])
+		@constraint(RestrictedModel, [g=1:NbGen, i=NbIntervalsGen[g]-addedNbIntervals[g]+1:NbIntervalsGen[g], t=A[g,i]:B[g,i] ] , RestrictedModel[:Varpbar][g,i,t] <= RestrictedModel[:Vargamma][g,i] * (StartUp[g] + (t - A[g,i])*RampUp[g] ))
+		@constraint(RestrictedModel, [g=1:NbGen, i=NbIntervalsGen[g]-addedNbIntervals[g]+1:NbIntervalsGen[g], t=A[g,i]:B[g,i] ] , RestrictedModel[:Varpbar][g,i,t] <= RestrictedModel[:Vargamma][g,i] * (ShutDown[g] + (B[g,i] - t)*RampDown[g] ))
+		@constraint(RestrictedModel, [g=1:NbGen, i=NbIntervalsGen[g]-addedNbIntervals[g]+1:NbIntervalsGen[g], t=A[g,i]+1:B[g,i] ], RestrictedModel[:Varpbar][g,i,t] - RestrictedModel[:Varp][g,i,t-1] <= RestrictedModel[:Vargamma][g,i] * RampUp[g])
+		@constraint(RestrictedModel, [g=1:NbGen, i=NbIntervalsGen[g]-addedNbIntervals[g]+1:NbIntervalsGen[g], t=A[g,i]+1:B[g,i] ], RestrictedModel[:Varpbar][g,i,t] - RestrictedModel[:Varp][g,i,t-1] <= RestrictedModel[:Vargamma][g,i] * (ShutDown[g] + (B[g,i] - t)*RampDown[g] - MinRunCapacity[g]))
+		@constraint(RestrictedModel, [g=1:NbGen, i=NbIntervalsGen[g]-addedNbIntervals[g]+1:NbIntervalsGen[g], t=A[g,i]+1:B[g,i] ], RestrictedModel[:Varpbar][g,i,t-1] - RestrictedModel[:Varp][g,i,t] <= RestrictedModel[:Vargamma][g,i] * RampDown[g])
+		@constraint(RestrictedModel, [g=1:NbGen, i=NbIntervalsGen[g]-addedNbIntervals[g]+1:NbIntervalsGen[g], t=A[g,i]+1:B[g,i] ], RestrictedModel[:Varpbar][g,i,t-1] - RestrictedModel[:Varp][g,i,t] <= RestrictedModel[:Vargamma][g,i] * (StartUp[g] + (t - A[g,i])*RampUp[g] - MinRunCapacity[g]))
+		
+		# Update constraints
+		for g=1:NbGen
+			for t=0:T+1
+				for i=NbIntervalsGen[g]-addedNbIntervals[g]+1:NbIntervalsGen[g]
+					if 1 <= t && t <= T
+						if A[g, i] <= t && t <= B[g, i] + DownTime[g]
+							set_normalized_coefficient(RestrictedModel[:minimum_down_time_constraint][g, t], RestrictedModel[:Vargamma][g, i], 1)
+						end
+						set_normalized_coefficient(RestrictedModel[:production_time][g, t], RestrictedModel[:Varp][g, i, t], -1)
+						set_normalized_coefficient(RestrictedModel[:productionbar_time][g, t], RestrictedModel[:Varpbar][g, i, t], -1)
+					end
+					if A[g, i] <= t && t <= B[g, i]
+						set_normalized_coefficient(RestrictedModel[:commitment_status][g, t], RestrictedModel[:Vargamma][g, i], 1)
+					end
+					if t == A[g, i]
+						set_normalized_coefficient(RestrictedModel[:startup_status][g, t], RestrictedModel[:Vargamma][g, i], 1)
+					end
+					if t == B[g, i] + 1
+						set_normalized_coefficient(RestrictedModel[:shutdown_status][g, t], RestrictedModel[:Vargamma][g, i], 1)
+					end
+				end
+			end
+		end
+		end
+		push!(time_vector, it_time + time_vector[end])
+		iter += 1
+	end
+
+	return Prices[end], Prices, arrObjPricing, time_vector
 end

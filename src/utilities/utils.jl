@@ -14,7 +14,9 @@ module Utilitaries
         end
         return y
     end
-    
+    const PCU = 3000
+    const PCD = -500
+    const PC = abs(PCU) + abs(PCD)
     include("dataloader.jl")
     include("metrics.jl")
     include("oracles.jl")

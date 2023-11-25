@@ -6,13 +6,13 @@ const OPT = ConvexHullPricing.Optimizer
 
 @info "Loading instances ..."
 list_of_instances = []
-for file in readdir("C:\\Users\\Sofiane\\Desktop\\ConvexHullPricing\\data\\belgian"; join=true)
+for file in readdir("data\\belgian"; join=true)
     push!(list_of_instances, UT.load_data(file))
 end
 @info "BE instances are loaded !"
 
 @info "Loading instances ..."
-for file in readdir("C:\\Users\\Sofiane\\Desktop\\ConvexHullPricing\\data\\ca"; join=true)
+for file in readdir("data\\ca"; join=true)
     # push!(list_of_instances, UT.load_data(file))
 end
 @info "CA instances are loaded !"
@@ -50,8 +50,8 @@ function benchmark(instance, opt)
     push!(CGdf.fiterates, iterf)
 end
 
-beoptimals = load_object("C:\\Users\\Sofiane\\Desktop\\ConvexHullPricing\\results\\objects\\beOptimalDF.jld2")
-# caoptimals = load_object("C:\\Users\\Sofiane\\Desktop\\ConvexHullPricing\\results\\objects\\caOptimalDF.jld2")
+beoptimals = load_object("results\\objects\\beOptimalDF.jld2")
+# caoptimals = load_object("results\\objects\\caOptimalDF.jld2")
 # optimals = vcat(beoptimals, caoptimals)
 @info "Optimal values of each instance loaded."
 @info "Running benchmarks"

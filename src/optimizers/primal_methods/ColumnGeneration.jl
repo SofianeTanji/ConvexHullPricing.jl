@@ -23,11 +23,10 @@ function ColumnGeneration(instance, initial_prices, niter, eps, verbose = -1)
     # Build Subproblems
     price = initial_prices
     table_subproblems = Array{Utilitaries.SubProblem}(undef, NbGen)
-    counter = 0
-
     for gen=1:NbGen
         model_subproblem = JuMP.direct_model(Gurobi.Optimizer(GRB_ENV[]))
         set_silent(model_subproblem)
+        set_optimizer_attribute(model_subproblem, "Threads", 8)
 
         # Variables
         @variable(model_subproblem, Varp[t=0:T+1], lower_bound = 0)
@@ -53,8 +52,7 @@ function ColumnGeneration(instance, initial_prices, niter, eps, verbose = -1)
         # Objective
         @objective(model_subproblem, Min, sum(NoLoadConsumption[gen] * MarginalCost[gen] * Varu[t] + FixedCost[gen] * Varv[t] + MarginalCost[gen] * Varp[t] for t=1:T) - sum(price[t]*Varp[t] for t=1:T))
         subproblem = Utilitaries.SubProblem(model_subproblem, Varp, Varpbar, Varu, Varv, Varw, VarCost, ConstrLogical, ConstrMinUpTime, ConstrMinDownTime, ConstrGenLimits1, ConstrGenLimits2, ConstrGenLimits3, ConstrRampUp, ConstrRampDown)
-        counter += 1
-        table_subproblems[counter] = subproblem
+        table_subproblems[gen] = subproblem
     end
     if verbose > 0
         @info "[CG: Subproblems computed.]"
@@ -97,6 +95,7 @@ function ColumnGeneration(instance, initial_prices, niter, eps, verbose = -1)
     # Build Restricted Master Program
     restricted_model = JuMP.direct_model(Gurobi.Optimizer(GRB_ENV[]))
     set_silent(restricted_model)
+    set_optimizer_attribute(restricted_model, "Threads", 8)
     DictZ = Dict()
     VarZ = @variable(restricted_model, [gen=1:NbGen, i=1:ScheduleCounter[gen]], lower_bound = 0, upper_bound = 1, base_name = "Z")
     for gen=1:NbGen
@@ -171,7 +170,7 @@ function ColumnGeneration(instance, initial_prices, niter, eps, verbose = -1)
     return last(Iterates), Iterates
 end
 
-function tCG(instance, initial_prices, eps = 1e-6, verbose = -1)
+function tColumnGeneration(instance, initial_prices, budget, eps, verbose = -1)
 
     # Unzip instance
     MinRunCapacity = instance.ThermalGen.MinRunCapacity
@@ -193,13 +192,10 @@ function tCG(instance, initial_prices, eps = 1e-6, verbose = -1)
     # Build Subproblems
     price = initial_prices
     table_subproblems = Array{Utilitaries.SubProblem}(undef, NbGen)
-    counter = 0
-
-    solvetime = 0
-
     for gen=1:NbGen
         model_subproblem = JuMP.direct_model(Gurobi.Optimizer(GRB_ENV[]))
         set_silent(model_subproblem)
+        set_optimizer_attribute(model_subproblem, "Threads", 8)
 
         # Variables
         @variable(model_subproblem, Varp[t=0:T+1], lower_bound = 0)
@@ -225,8 +221,7 @@ function tCG(instance, initial_prices, eps = 1e-6, verbose = -1)
         # Objective
         @objective(model_subproblem, Min, sum(NoLoadConsumption[gen] * MarginalCost[gen] * Varu[t] + FixedCost[gen] * Varv[t] + MarginalCost[gen] * Varp[t] for t=1:T) - sum(price[t]*Varp[t] for t=1:T))
         subproblem = Utilitaries.SubProblem(model_subproblem, Varp, Varpbar, Varu, Varv, Varw, VarCost, ConstrLogical, ConstrMinUpTime, ConstrMinDownTime, ConstrGenLimits1, ConstrGenLimits2, ConstrGenLimits3, ConstrRampUp, ConstrRampDown)
-        counter += 1
-        table_subproblems[counter] = subproblem
+        table_subproblems[gen] = subproblem
     end
     if verbose > 0
         @info "[CG: Subproblems computed.]"
@@ -269,6 +264,7 @@ function tCG(instance, initial_prices, eps = 1e-6, verbose = -1)
     # Build Restricted Master Program
     restricted_model = JuMP.direct_model(Gurobi.Optimizer(GRB_ENV[]))
     set_silent(restricted_model)
+    set_optimizer_attribute(restricted_model, "Threads", 8)
     DictZ = Dict()
     VarZ = @variable(restricted_model, [gen=1:NbGen, i=1:ScheduleCounter[gen]], lower_bound = 0, upper_bound = 1, base_name = "Z")
     for gen=1:NbGen
@@ -290,24 +286,30 @@ function tCG(instance, initial_prices, eps = 1e-6, verbose = -1)
     ObjMaster = 0
     ObjVect = []
     Iterates = []
-    for iter=1:500
+    time_vector = [0.]
+    iter = 1
+    while time_vector[end] <= budget
         if verbose > 0
             @info "[CG: Iteration $iter]"
         end
+        it_time = @elapsed begin
         @objective(RMP.model, Min, sum(sum(DictZ[gen, i] * ScheduleCost[gen, i] for i=1:ScheduleCounter[gen]) for gen=1:NbGen) - LostLoad*sum(VarL[t] for t=1:T))
-        stime = @timed optimize!(RMP.model)
-        solvetime += stime.time
+        optimize!(RMP.model)
         ObjMaster = objective_value(RMP.model)
         push!(ObjVect, ObjMaster)
-        price = dual.(RMP.ConstrBalance)
-        push!(Iterates, price)
+        if iter > 1
+            price = dual.(RMP.ConstrBalance)
+            push!(Iterates, price)
+        else
+            price = initial_prices
+            push!(Iterates, price)
+        end
         PiDual = dual.(RMP.ConstrConvexComb)
         StoppingCriterion = 1
         for gen=1:NbGen
             SubProblem = table_subproblems[gen]
             @objective(SubProblem.model, Min, sum(NoLoadConsumption[gen] * MarginalCost[gen] * SubProblem.Varu[t] + FixedCost[gen] * SubProblem.Varv[t] + MarginalCost[gen] * SubProblem.Varp[t] for t=1:T) - sum(price[t] * SubProblem.Varp[t] for t=1:T))
-            stime = @timed optimize!(SubProblem.model)
-            solvetime += stime.time
+            optimize!(SubProblem.model)
             termination_status(SubProblem.model)
             ReducedCost = objective_value(SubProblem.model) - PiDual[gen]
             if ReducedCost < eps
@@ -315,6 +317,7 @@ function tCG(instance, initial_prices, eps = 1e-6, verbose = -1)
                 SubP = value.(SubProblem.Varp).data
                 SubU = value.(SubProblem.Varu).data
                 SubV = value.(SubProblem.Varv).data
+                SubW = value.(SubProblem.Varw).data
 
                 ScheduleCounter[gen] += 1
                 ScheduleP[gen, ScheduleCounter[gen]] = SubP[2:T+1]
@@ -335,6 +338,9 @@ function tCG(instance, initial_prices, eps = 1e-6, verbose = -1)
         if StoppingCriterion == 1
             break
         end
+        end
+        push!(time_vector, it_time + time_vector[end])
+        iter += 1
     end
-    return Iterates, solvetime
+    return last(Iterates), Iterates, time_vector
 end

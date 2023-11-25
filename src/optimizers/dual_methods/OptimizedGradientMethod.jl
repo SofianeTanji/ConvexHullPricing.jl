@@ -15,7 +15,7 @@ function OptimizedGradientMethod(instance, initial_prices, niter, smoothing_para
         end    
         fun_oracle, grad_oracle = Utilitaries.smooth_oracle(instance, y_iterates[t], smoothing_parameter)
         push!(fun_iterates, fun_oracle)
-        # fun_oracle, grad_oracle = - fun_oracle, - grad_oracle # Maximizing a concave function <=> Minimizing a convex function
+        fun_oracle, grad_oracle = - fun_oracle, - grad_oracle # Maximizing a concave function <=> Minimizing a convex function
 
         push!(x_iterates, y_iterates[t] - (1 / Lips) * grad_oracle)
         if t == niter
@@ -26,6 +26,5 @@ function OptimizedGradientMethod(instance, initial_prices, niter, smoothing_para
 
         push!(y_iterates, x_iterates[t + 1] + ((Thetas[t] - 1)/Thetas[t + 1]) * (x_iterates[t + 1] - x_iterates[t]) + (Thetas[t]/Thetas[t + 1]) * (x_iterates[t + 1] - y_iterates[t]))
     end
-    push!(fun_iterates, Utilitaries.fast_oracle(instance, last(x_iterates))[1])
     return last(x_iterates), x_iterates, fun_iterates
 end
