@@ -11,7 +11,7 @@ function DowG(instance, initial_prices, niter, initial_distance_estimate = PC, v
             @info "[DowG: Iteration $t]"
         end
         push!(list_R, maximum([norm(iterates[t] - iterates[1]), list_R[t]]))
-        fun_oracle, grad_oracle = Utilitaries.super_fast_oracle(instance, iterates[t])
+        fun_oracle, grad_oracle = Utilitaries.exact_oracle(instance, iterates[t])
         push!(fun_iterates, fun_oracle)
         fun_oracle, grad_oracle = - fun_oracle, - grad_oracle # Maximizing a concave function <=> Minimizing a convex function
         push!(list_V, list_V[t] + list_R[t + 1]^2 * norm(grad_oracle)^2)
@@ -36,7 +36,7 @@ function tDowG(instance, initial_prices, budget, initial_distance_estimate = PC,
         end
         it_time = @elapsed begin
         push!(list_R, maximum([norm(iterates[t] - iterates[1]), list_R[t]]))
-        fun_oracle, grad_oracle = Utilitaries.super_fast_oracle(instance, iterates[t])
+        fun_oracle, grad_oracle = Utilitaries.exact_oracle(instance, iterates[t])
         push!(fun_iterates, fun_oracle)
         fun_oracle, grad_oracle = - fun_oracle, - grad_oracle # Maximizing a concave function <=> Minimizing a convex function
         push!(list_V, list_V[t] + list_R[t + 1]^2 * norm(grad_oracle)^2)

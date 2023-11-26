@@ -20,7 +20,7 @@ function BundleLevelMethod(instance, initial_prices, niter, alpha, verbose = -1)
         if verbose > 0
             @info "[BLM: Iteration $i]"
         end
-        fun_oracle, grad_oracle = Utilitaries.super_fast_oracle(instance, iterates[i])
+        fun_oracle, grad_oracle = Utilitaries.exact_oracle(instance, iterates[i])
         push!(fun_iterates, fun_oracle)
         fun_oracle, grad_oracle = - fun_oracle, - grad_oracle # Maximizing a concave function <=> Minimizing a convex function
 
@@ -61,7 +61,7 @@ function tOptimal(instance, initial_prices, alpha, verbose = 1)
     set_silent(model_projection)
     time_vector = [0.]
     idx = 1
-    while UpperBound - LowerBound >= 3000
+    while UpperBound - LowerBound >= 500
         if verbose > 0
             @info "[BLM: Iteration $idx ; Gap = $(UpperBound - LowerBound)]"
         end

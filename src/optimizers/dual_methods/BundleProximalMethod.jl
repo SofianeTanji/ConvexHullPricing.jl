@@ -8,13 +8,13 @@ function BundleProximalMethod(instance, initial_prices, niter, alpha, stepsize, 
     fun_iterates = []
     model_proxop = JuMP.direct_model(Gurobi.Optimizer(GRB_ENV[]))
     set_silent(model_proxop)
-    fizp1 = + Utilitaries.super_fast_oracle(instance, z_iterates[1])[1]
+    fizp1 = + Utilitaries.exact_oracle(instance, z_iterates[1])[1]
     UpperBound = Inf
     for i=1:niter
         if verbose > 0
             @info "[BPM: Iteration $i]"
         end
-        fun_oracle, grad_oracle = Utilitaries.super_fast_oracle(instance, iterates[i])
+        fun_oracle, grad_oracle = Utilitaries.exact_oracle(instance, iterates[i])
         fun_oracle, grad_oracle = - fun_oracle, - grad_oracle
         push!(fun_iterates, fun_oracle)
 
@@ -30,7 +30,7 @@ function BundleProximalMethod(instance, initial_prices, niter, alpha, stepsize, 
         optimize!(model_proxop)
         push!(z_iterates, value.(Price))
 
-        fzp1, gzp1 = Utilitaries.super_fast_oracle(instance, z_iterates[i + 1])
+        fzp1, gzp1 = Utilitaries.exact_oracle(instance, z_iterates[i + 1])
         fzp1, gzp1 = - fzp1, - gzp1
         fizp1 = maximum([fizp1, fzp1 + dot(gzp1, z_iterates[i + 1] - z_iterates[i])])
 
@@ -50,7 +50,7 @@ function tBundleProximalMethod(instance, initial_prices, budget, alpha, stepsize
     fun_iterates = []
     model_proxop = JuMP.direct_model(Gurobi.Optimizer(GRB_ENV[]))
     set_silent(model_proxop)
-    fizp1 = + Utilitaries.super_fast_oracle(instance, z_iterates[1])[1]
+    fizp1 = + Utilitaries.exact_oracle(instance, z_iterates[1])[1]
     UpperBound = Inf
     time_vector = [0.]
     idx = 1
@@ -59,7 +59,7 @@ function tBundleProximalMethod(instance, initial_prices, budget, alpha, stepsize
             @info "[BPM: Iteration $i]"
         end
         it_time = @elapsed begin
-        fun_oracle, grad_oracle = Utilitaries.super_fast_oracle(instance, iterates[idx])
+        fun_oracle, grad_oracle = Utilitaries.exact_oracle(instance, iterates[idx])
         fun_oracle, grad_oracle = - fun_oracle, - grad_oracle
         push!(fun_iterates, fun_oracle)
 
@@ -75,7 +75,7 @@ function tBundleProximalMethod(instance, initial_prices, budget, alpha, stepsize
         optimize!(model_proxop)
         push!(z_iterates, value.(Price))
 
-        fzp1, gzp1 = Utilitaries.super_fast_oracle(instance, z_iterates[idx + 1])
+        fzp1, gzp1 = Utilitaries.exact_oracle(instance, z_iterates[idx + 1])
         fzp1, gzp1 = - fzp1, - gzp1
         fizp1 = maximum([fizp1, fzp1 + dot(gzp1, z_iterates[idx + 1] - z_iterates[idx])])
 

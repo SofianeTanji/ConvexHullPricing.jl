@@ -9,7 +9,7 @@ function SubgradientMethod(instance, initial_prices, niter, alpha, verbose = -1)
         if verbose > 0
             @info "[SubG: Iteration $i]"
         end
-        fun_oracle, grad_oracle = Utilitaries.super_fast_oracle(instance, iterates[i])
+        fun_oracle, grad_oracle = Utilitaries.exact_oracle(instance, iterates[i])
         push!(fun_iterates, fun_oracle)
         fun_oracle, grad_oracle = - fun_oracle, - grad_oracle # Maximizing a concave function <=> Minimizing a convex function
 
@@ -43,7 +43,7 @@ function lastSubgradientMethod(instance, initial_prices, niter, R, verbose = -1)
         if verbose > 0
             @info "[SubG: Iteration $k]"
         end
-        fun_oracle, grad_oracle = Utilitaries.super_fast_oracle(instance, iterates[k])
+        fun_oracle, grad_oracle = Utilitaries.exact_oracle(instance, iterates[k])
         push!(fun_iterates, fun_oracle)
         fun_oracle, grad_oracle = - fun_oracle, - grad_oracle # Maximizing a concave function <=> Minimizing a convex function
         

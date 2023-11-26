@@ -15,7 +15,6 @@ module Optimizer
     include("dual_methods/BundleProximalMethod.jl")
     include("dual_methods/DAdaptation.jl")
     include("dual_methods/DoWG.jl")
-    include("dual_methods/OptimizedGradientMethod.jl")
     include("dual_methods/FastGradientMethod.jl")
     include("dual_methods/PolyakMethod.jl")
     include("dual_methods/SubgradientMethod.jl")

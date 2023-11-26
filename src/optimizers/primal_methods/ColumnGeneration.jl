@@ -26,6 +26,7 @@ function ColumnGeneration(instance, initial_prices, niter, eps, verbose = -1)
     for gen=1:NbGen
         model_subproblem = JuMP.direct_model(Gurobi.Optimizer(GRB_ENV[]))
         set_silent(model_subproblem)
+        set_optimizer_attributes(model_subproblem, "MIPGap" => 0, "MIPGapAbs" => 1e-8)
         set_optimizer_attribute(model_subproblem, "Threads", 8)
 
         # Variables
@@ -95,6 +96,7 @@ function ColumnGeneration(instance, initial_prices, niter, eps, verbose = -1)
     # Build Restricted Master Program
     restricted_model = JuMP.direct_model(Gurobi.Optimizer(GRB_ENV[]))
     set_silent(restricted_model)
+    set_optimizer_attributes(restricted_model, "MIPGap" => 0, "MIPGapAbs" => 1e-8)
     set_optimizer_attribute(restricted_model, "Threads", 8)
     DictZ = Dict()
     VarZ = @variable(restricted_model, [gen=1:NbGen, i=1:ScheduleCounter[gen]], lower_bound = 0, upper_bound = 1, base_name = "Z")
@@ -195,6 +197,7 @@ function tColumnGeneration(instance, initial_prices, budget, eps, verbose = -1)
     for gen=1:NbGen
         model_subproblem = JuMP.direct_model(Gurobi.Optimizer(GRB_ENV[]))
         set_silent(model_subproblem)
+        set_optimizer_attributes(model_subproblem, "MIPGap" => 0, "MIPGapAbs" => 1e-8)
         set_optimizer_attribute(model_subproblem, "Threads", 8)
 
         # Variables
@@ -264,6 +267,7 @@ function tColumnGeneration(instance, initial_prices, budget, eps, verbose = -1)
     # Build Restricted Master Program
     restricted_model = JuMP.direct_model(Gurobi.Optimizer(GRB_ENV[]))
     set_silent(restricted_model)
+    set_optimizer_attributes(restricted_model, "MIPGap" => 0, "MIPGapAbs" => 1e-8)
     set_optimizer_attribute(restricted_model, "Threads", 8)
     DictZ = Dict()
     VarZ = @variable(restricted_model, [gen=1:NbGen, i=1:ScheduleCounter[gen]], lower_bound = 0, upper_bound = 1, base_name = "Z")

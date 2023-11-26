@@ -12,7 +12,7 @@ function FastGradientMethod(instance, initial_prices, niter, smoothing_parameter
         if verbose > 0
             @info "[FGM: Iteration $t]"
         end    
-        fun_oracle, grad_oracle = Utilitaries.smooth_oracle(instance, y_iterates[t], smoothing_parameter)
+        fun_oracle, grad_oracle = Utilitaries.exact_smooth_oracle(instance, y_iterates[t], smoothing_parameter)
         push!(fun_iterates, fun_oracle)
         fun_oracle, grad_oracle = - fun_oracle, - grad_oracle # Maximizing a concave function <=> Minimizing a convex function
 

@@ -4,7 +4,7 @@ using ..Utilitaries, LinearAlgebra
 function DAdaptation(instance, initial_prices, niter, initial_distance_estimate = PC, verbose = -1)
     T = length(instance.Load)
     iterates = [initial_prices]
-    fun_oracle, grad_oracle = Utilitaries.super_fast_oracle(instance, iterates[1])
+    fun_oracle, grad_oracle = Utilitaries.exact_oracle(instance, iterates[1])
     fun_iterates = Array([])
     grad_iterates = Array([])
     S = [zeros(T)]
@@ -14,7 +14,7 @@ function DAdaptation(instance, initial_prices, niter, initial_distance_estimate 
         if verbose > 0
             @info "[DAdaptation: Iteration $k]"
         end
-        fun_oracle, grad_oracle = Utilitaries.super_fast_oracle(instance, iterates[k])
+        fun_oracle, grad_oracle = Utilitaries.exact_oracle(instance, iterates[k])
         push!(fun_iterates, fun_oracle)
         fun_oracle, grad_oracle = - fun_oracle, - grad_oracle # Maximizing a concave function <=> Minimizing a convex function
         push!(grad_iterates, grad_oracle)
@@ -31,7 +31,7 @@ end
 function tDAdaptation(instance, initial_prices, budget, initial_distance_estimate = PC, verbose = -1)
     T = length(instance.Load)
     iterates = [initial_prices]
-    fun_oracle, grad_oracle = Utilitaries.super_fast_oracle(instance, iterates[1])
+    fun_oracle, grad_oracle = Utilitaries.exact_oracle(instance, iterates[1])
     fun_iterates = Array([])
     grad_iterates = Array([])
     S = [zeros(T)]
@@ -44,7 +44,7 @@ function tDAdaptation(instance, initial_prices, budget, initial_distance_estimat
             @info "[DAdaptation: Iteration $k]"
         end
         it_time = @elapsed begin
-        fun_oracle, grad_oracle = Utilitaries.super_fast_oracle(instance, iterates[k])
+        fun_oracle, grad_oracle = Utilitaries.exact_oracle(instance, iterates[k])
         push!(fun_iterates, fun_oracle)
         fun_oracle, grad_oracle = - fun_oracle, - grad_oracle # Maximizing a concave function <=> Minimizing a convex function
         push!(grad_iterates, grad_oracle)
