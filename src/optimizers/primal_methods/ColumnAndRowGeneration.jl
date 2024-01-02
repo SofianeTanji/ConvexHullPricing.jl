@@ -1,4 +1,4 @@
-using JuMP
+using JuMP, SparseArrays
 
 function set_T(UT,T_max, NbGen)
 	index_gen = zeros(NbGen)
@@ -20,8 +20,8 @@ function set_T(UT,T_max, NbGen)
 		# index+=1;
 		index_gen[g] = index
 	end
-	A = zeros(NbGen, convert(Int64,maximum(index_gen)));
-	B = zeros(NbGen, convert(Int64,maximum(index_gen)));
+	A = sparse(zeros(NbGen, convert(Int64,maximum(index_gen))))
+	B = sparse(zeros(NbGen, convert(Int64,maximum(index_gen))))
 
 	for g=1:NbGen
 		index = 1
@@ -42,10 +42,15 @@ function set_T(UT,T_max, NbGen)
 end
 
 function Compute_A_B(U, NbGen)
+	# Initialize an array to store the number of intervals per generation
 	NbIntervalsGen = zeros(Int64, NbGen)
+
+	# Check if there is more than one generator
 	if NbGen > 1
+		# Loop through each generator
 		for g=1:NbGen
 			flag = false
+			# Loop through each U value of the current generator
 			for elem in U[g,:]
 				if elem > 0
 					if flag == false
@@ -57,6 +62,7 @@ function Compute_A_B(U, NbGen)
 				end
 			end
 		end
+	# same logic without the outer loop
 	else
 		flag = false
 		for elem in U
@@ -70,10 +76,10 @@ function Compute_A_B(U, NbGen)
 			end
 		end
 	end
-	A = (1) * ones(Int64, NbGen, maximum(NbIntervalsGen))
-	B = (1) * ones(Int64, NbGen, maximum(NbIntervalsGen))
+	# Initialize arrays A and B to store interval start and end indices
+	A = (- 1) * ones(Int64, NbGen, maximum(NbIntervalsGen))
+	B = (- 1) * ones(Int64, NbGen, maximum(NbIntervalsGen))
 	a = 0
-	b = 0
 	if NbGen > 1
 		for g=1:NbGen
 			flag = false
@@ -94,6 +100,7 @@ function Compute_A_B(U, NbGen)
 				end
 			end
 		end
+	# Same logic without the outer loop
 	else
 		flag = false
 		count = 0
@@ -115,6 +122,7 @@ function Compute_A_B(U, NbGen)
 	end
 	return A, B, NbIntervalsGen
 end
+
 
 function A_B_In_Intervals(a, b, g, A, B, NbIntervalsGen)
 	for i=1:NbIntervalsGen[g]
@@ -258,7 +266,6 @@ function ColumnAndRowGeneration(instance, niter, eps)
 	# Solving Matching problem, get Intervals
 	model = JuMP.direct_model(Gurobi.Optimizer(GRB_ENV[]))
     set_silent(model)
-	set_optimizer_attributes(model, "MIPGap" => 0, "MIPGapAbs" => 1e-8)
 	set_optimizer_attribute(model, "Threads", 8)
 	@variable(model, Varp[g=1:NbGen, t=0:T+1], lower_bound = 0)
     @variable(model, Varpbar[g=1:NbGen, t=0:T+1], lower_bound = 0)
@@ -281,11 +288,18 @@ function ColumnAndRowGeneration(instance, niter, eps)
     @constraint(model, ConstrRampDown[g=1:NbGen, t=1:T+1], Varpbar[g, t - 1] - Varp[g, t] <= RampDown[g] * Varu[g, t] + ShutDown[g] * Varw[g, t])
 
 	for g=1:NbGen
-		JuMP.fix(model[:Varu][g,0], 0; force = true)
-		JuMP.fix(model[:Varv][g,0], 0; force = true)
-		JuMP.fix(model[:Varw][g,0], 0; force = true)
-		JuMP.fix(model[:Varp][g,0], 0; force = true)
-		JuMP.fix(model[:Varpbar][g,0], 0; force = true)
+		JuMP.fix(model[:Varu][g, 0], 0; force = true)
+		JuMP.fix(model[:Varv][g, 0], 0; force = true)
+		JuMP.fix(model[:Varw][g, 0], 0; force = true)
+		JuMP.fix(model[:Varp][g, 0], 0; force = true)
+		JuMP.fix(model[:Varpbar][g, 0], 0; force = true)
+	end
+	for g=1:NbGen
+		JuMP.fix(model[:Varu][g, T + 1], 0; force = true)
+		JuMP.fix(model[:Varv][g, T + 1], 0; force = true)
+		JuMP.fix(model[:Varw][g, T + 1], 0; force = true)
+		JuMP.fix(model[:Varp][g, T + 1], 0; force = true)
+		JuMP.fix(model[:Varpbar][g, T + 1], 0; force = true)
 	end
 
 	@objective(model, Min, sum(sum(NoLoadConsumption[g] * MarginalCost[g] * model[:Varu][g, t] + FixedCost[g] * model[:Varv][g, t] + MarginalCost[g] * model[:Varp][g, t] for t=1:T) for g=1:NbGen) - LostLoad * sum(model[:VarL][t] for t=1:T))
@@ -296,8 +310,7 @@ function ColumnAndRowGeneration(instance, niter, eps)
 		MatchingU = MatchingU[:,2:T+1]
 	else
 		MatchingU = MatchingU[2:T+1]
-	end	
-	(A,B, NbIntervalsGen) = Compute_A_B(MatchingU, NbGen)
+	end
 	(A,B, NbIntervalsGen) = set_T(UpTime, T, NbGen)
 	addedA = copy(A)
 	addedB = copy(B)
@@ -306,7 +319,6 @@ function ColumnAndRowGeneration(instance, niter, eps)
 	# Restricted model
 	RestrictedModel = JuMP.direct_model(Gurobi.Optimizer(GRB_ENV[]))
     set_silent(RestrictedModel)
-	set_optimizer_attributes(RestrictedModel, "MIPGap" => 0, "MIPGapAbs" => 1e-8)
 	set_optimizer_attribute(RestrictedModel, "Threads", 8)
 	@variable(RestrictedModel, 0 <= Varp[g=1:NbGen, i=1:addedNbIntervals[g], t=0:T+1])
 	@variable(RestrictedModel, 0 <= Varpbar[g=1:NbGen, i=1:addedNbIntervals[g], t=0:T+1])
@@ -474,7 +486,7 @@ function ColumnAndRowGeneration(instance, niter, eps)
 	return Prices[end], Prices, arrObjPricing
 end
 
-function tColumnAndRowGeneration(instance, budget, eps)
+function tCRG(instance, budget, eps)
 	# Unzip instance
     MinRunCapacity = instance.ThermalGen.MinRunCapacity
     MaxRunCapacity = instance.ThermalGen.MaxRunCapacity
@@ -495,7 +507,6 @@ function tColumnAndRowGeneration(instance, budget, eps)
 	# Solving Matching problem, get Intervals
 	model = JuMP.direct_model(Gurobi.Optimizer(GRB_ENV[]))
     set_silent(model)
-	set_optimizer_attributes(model, "MIPGap" => 0, "MIPGapAbs" => 1e-8)
 	set_optimizer_attribute(model, "Threads", 8)
 	@variable(model, Varp[g=1:NbGen, t=0:T+1], lower_bound = 0)
     @variable(model, Varpbar[g=1:NbGen, t=0:T+1], lower_bound = 0)
@@ -526,7 +537,7 @@ function tColumnAndRowGeneration(instance, budget, eps)
 	end
 
 	@objective(model, Min, sum(sum(NoLoadConsumption[g] * MarginalCost[g] * model[:Varu][g, t] + FixedCost[g] * model[:Varv][g, t] + MarginalCost[g] * model[:Varp][g, t] for t=1:T) for g=1:NbGen) - LostLoad * sum(model[:VarL][t] for t=1:T))
-    optimize!(model)
+	optimize!(model)
 	MatchingU = value.(model[:Varu]).data
 	delete(model, loads)
 	if NbGen > 1
@@ -534,7 +545,7 @@ function tColumnAndRowGeneration(instance, budget, eps)
 	else
 		MatchingU = MatchingU[2:T+1]
 	end	
-	(A,B, NbIntervalsGen) = Compute_A_B(MatchingU, NbGen)
+	@info " set T"
 	(A,B, NbIntervalsGen) = set_T(UpTime, T, NbGen)
 	addedA = copy(A)
 	addedB = copy(B)
@@ -543,8 +554,8 @@ function tColumnAndRowGeneration(instance, budget, eps)
 	# Restricted model
 	RestrictedModel = JuMP.direct_model(Gurobi.Optimizer(GRB_ENV[]))
     set_silent(RestrictedModel)
-	set_optimizer_attributes(RestrictedModel, "MIPGap" => 0, "MIPGapAbs" => 1e-8)
 	set_optimizer_attribute(RestrictedModel, "Threads", 8)
+	@info "create restricted model"
 	@variable(RestrictedModel, 0 <= Varp[g=1:NbGen, i=1:addedNbIntervals[g], t=0:T+1])
 	@variable(RestrictedModel, 0 <= Varpbar[g=1:NbGen, i=1:addedNbIntervals[g], t=0:T+1])
 	@variable(RestrictedModel, 0 <= Vargamma[g=1:NbGen, i=1:addedNbIntervals[g]])
@@ -556,21 +567,18 @@ function tColumnAndRowGeneration(instance, budget, eps)
 	@variable(RestrictedModel, 0 <= VarL[t=1:T])
 	@constraint(RestrictedModel, [t=1:T], VarL[t] <= L[t])
 	@constraint(RestrictedModel, [g=1:NbGen, i=1:addedNbIntervals[g]], Vargamma[g,i] <= 1)
-
 	DictGamma = Dict()
 	DictP = Dict()
 	DictPbar = Dict()
-	
 	for g=1:NbGen
 		for i=1:addedNbIntervals[g]
-			DictGamma[g, i] = RestrictedModel[:Vargamma][g, i]
+			DictGamma[g, i] = Vargamma[g, i]
 			for t=0:T+1
-				DictP[g, i, t] = RestrictedModel[:Varp][g, i, t]
-				DictPbar[g, i, t] = RestrictedModel[:Varpbar][g, i, t]
+				DictP[g, i, t] = Varp[g, i, t]
+				DictPbar[g, i, t] = Varpbar[g, i, t]
 			end
 		end
 	end
-
 	CountP = 0
 	CountGamma = 0
 	CountPTime = 0
@@ -583,7 +591,7 @@ function tColumnAndRowGeneration(instance, budget, eps)
 			CountGamma += 1
 		end
 	end
-
+	@info "fdp"
 	# Feasible Dispatch Polytope
 	@constraint(RestrictedModel, no_production[g=1:NbGen, i=1:addedNbIntervals[g], t=0:T+1; (t<addedA[g,i] || t>addedB[g,i])], DictP[g,i,t] <= 0)
 	@constraint(RestrictedModel, min_output[g=1:NbGen, i=1:addedNbIntervals[g], t=addedA[g,i]:addedB[g,i] ], -DictP[g,i,t] <= -DictGamma[g,i] * MinRunCapacity[g])
@@ -603,7 +611,7 @@ function tColumnAndRowGeneration(instance, budget, eps)
 	@constraint(RestrictedModel, shutdown_status[g=1:NbGen, t=0:T+1], sum(DictGamma[g,i] for i=1:addedNbIntervals[g] if (t == addedB[g,i]+1)) - Varw[g,t] == 0)
 	
 	@constraint(RestrictedModel, loads[t=1:T], sum( VarpTime[g,t] for g=1:NbGen) - VarL[t] == 0)
-
+	@info "fixing constraints"
 	for g=1:NbGen
 		JuMP.fix(RestrictedModel[:Varu][g,0], 0; force = true)
 		JuMP.fix(RestrictedModel[:Varv][g,0], 0; force = true)
@@ -611,7 +619,7 @@ function tColumnAndRowGeneration(instance, budget, eps)
 		JuMP.fix(RestrictedModel[:VarpTime][g,0], 0; force = true)
 		JuMP.fix(RestrictedModel[:VarpbarTime][g,0], 0; force = true)
 	end
-
+	@info "dexfining objective"
 	@objective(RestrictedModel, Min, sum(sum(NoLoadConsumption[g] * MarginalCost[g] * RestrictedModel[:Varu][g, t] + FixedCost[g] * RestrictedModel[:Varv][g, t] + MarginalCost[g] * RestrictedModel[:VarpTime][g, t] for t=1:T) for g=1:NbGen) - LostLoad * sum(RestrictedModel[:VarL][t] for t=1:T))
 
 	
@@ -623,7 +631,9 @@ function tColumnAndRowGeneration(instance, budget, eps)
 
 	time_vector = [0.]
     iter = 1
+	@info "Starting iterations"
     while time_vector[end] <= budget
+		@info "Iteration $iter"
 		it_time = @elapsed begin
 		# Solve Restricted Problem
 		optimize!(RestrictedModel)
@@ -633,7 +643,8 @@ function tColumnAndRowGeneration(instance, budget, eps)
 		push!(arrObjRestricted, ObjRestricted)
 		# Solve Pricing Problem
 		@objective(model, Min, sum(sum(NoLoadConsumption[g] * MarginalCost[g] * model[:Varu][g, t] + FixedCost[g] * model[:Varv][g, t] + MarginalCost[g] * model[:Varp][g, t] for t=1:T) for g=1:NbGen) - LostLoad * sum(model[:VarL][t] for t=1:T) - sum(Price[t] * (sum(model[:Varp][g, t] for g=1:NbGen) - model[:VarL][t]) for t=1:T))
-		optimize!(model)
+		my_time = @elapsed begin optimize!(model) end
+		@info "Optimizing in iteration $iter took $my_time"
 		ObjPricing = objective_value(model)
 		push!(arrObjPricing, ObjPricing)
 		PricingU = value.(model[:Varu]).data

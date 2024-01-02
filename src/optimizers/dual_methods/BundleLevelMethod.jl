@@ -9,12 +9,13 @@ function BundleLevelMethod(instance, initial_prices, niter, alpha, verbose = -1)
 
     model_update_lb = JuMP.direct_model(Gurobi.Optimizer(GRB_ENV[]))
     set_silent(model_update_lb)
-
+    set_optimizer_attributes(model_update_lb, "MIPGap" => 0, "MIPGapAbs" => 1e-8)
     VarPrice = @variable(model_update_lb, [1:T], lower_bound = PCD, upper_bound = PCU)
     Vart = @variable(model_update_lb)
     
     model_projection = JuMP.direct_model(Gurobi.Optimizer(GRB_ENV[]))
     set_silent(model_projection)
+    set_optimizer_attributes(model_projection, "MIPGap" => 0, "MIPGapAbs" => 1e-8)
 
     for i=1:niter
         if verbose > 0
@@ -53,15 +54,18 @@ function tOptimal(instance, initial_prices, alpha, verbose = 1)
 
     model_update_lb = JuMP.direct_model(Gurobi.Optimizer(GRB_ENV[]))
     set_silent(model_update_lb)
+    set_optimizer_attributes(model_update_lb, "MIPGap" => 0, "MIPGapAbs" => 1e-8)
 
     VarPrice = @variable(model_update_lb, [1:T], lower_bound = PCD, upper_bound = PCU)
     Vart = @variable(model_update_lb)
     
     model_projection = JuMP.direct_model(Gurobi.Optimizer(GRB_ENV[]))
     set_silent(model_projection)
+    set_optimizer_attributes(model_projection, "MIPGap" => 0, "MIPGapAbs" => 1e-8)
+
     time_vector = [0.]
     idx = 1
-    while UpperBound - LowerBound >= 500
+    while UpperBound - LowerBound >= 150
         if verbose > 0
             @info "[BLM: Iteration $idx ; Gap = $(UpperBound - LowerBound)]"
         end
@@ -104,17 +108,20 @@ function tBundleLevelMethod(instance, initial_prices, budget, alpha, verbose = -
 
     model_update_lb = JuMP.direct_model(Gurobi.Optimizer(GRB_ENV[]))
     set_silent(model_update_lb)
+    set_optimizer_attributes(model_update_lb, "MIPGap" => 0, "MIPGapAbs" => 1e-8)
 
     VarPrice = @variable(model_update_lb, [1:T], lower_bound = PCD, upper_bound = PCU)
     Vart = @variable(model_update_lb)
     
     model_projection = JuMP.direct_model(Gurobi.Optimizer(GRB_ENV[]))
     set_silent(model_projection)
+    set_optimizer_attributes(model_projection, "MIPGap" => 0, "MIPGapAbs" => 1e-8)
+
     time_vector = [0.]
     idx = 1
     while time_vector[end] <= budget
         if verbose > 0
-            @info "[BLM: Iteration $i]"
+            @info "[BLM: Iteration $(idx) ; UB = $(UpperBound), LB = $(LowerBound), UB-LB = $(UpperBound - LowerBound)]"
         end
         it_time = @elapsed begin
         fun_oracle, grad_oracle = Utilitaries.exact_oracle(instance, iterates[idx])
