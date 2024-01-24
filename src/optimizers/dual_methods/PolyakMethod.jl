@@ -36,7 +36,7 @@ function tPolyakMethod(instance, initial_prices, budget, ObjSol, verbose = - 1)
         fun_oracle, grad_oracle = Utilitaries.exact_oracle(instance, iterates[i])
         push!(fun_iterates, fun_oracle)
         fun_oracle, grad_oracle = - fun_oracle, - grad_oracle # Maximizing a concave function <=> Minimizing a convex function
-        if (norm(grad_oracle))^2 <= 1e-5
+        if (norm(grad_oracle))^2 <= 1e-6
             break
         end
         PolyakStepsize = abs(fun_oracle + ObjSol)/(norm(grad_oracle))^2

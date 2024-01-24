@@ -90,7 +90,7 @@ function ColumnGeneration(instance, initial_prices, niter, eps, verbose = -1)
     
     end
     if verbose > 0
-        @info "[CG: Feasible schedules computed.]"
+        @info "[CG: Initial Feasible schedules computed.]"
     end
     # Build Restricted Master Program
     restricted_model = JuMP.direct_model(Gurobi.Optimizer(GRB_ENV[]))
@@ -140,7 +140,7 @@ function ColumnGeneration(instance, initial_prices, niter, eps, verbose = -1)
             optimize!(SubProblem.model)
             termination_status(SubProblem.model)
             ReducedCost = objective_value(SubProblem.model) - PiDual[gen]
-            if ReducedCost < eps
+            if ReducedCost <= eps
                 StoppingCriterion = 0
                 SubP = value.(SubProblem.Varp).data
                 SubU = value.(SubProblem.Varu).data
@@ -342,5 +342,9 @@ function tColumnGeneration(instance, initial_prices, budget, eps, verbose = -1)
         push!(time_vector, it_time + time_vector[end])
         iter += 1
     end
-    return last(Iterates), Iterates, time_vector
+    f_iterates = Float64[]
+    for ρ in Iterates
+        push!(f_iterates, Utilitaries.exact_oracle(instance, ρ)[1])
+    end
+    return last(Iterates), Iterates, f_iterates, time_vector
 end

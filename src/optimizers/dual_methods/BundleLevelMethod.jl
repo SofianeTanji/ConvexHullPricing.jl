@@ -1,12 +1,14 @@
 # Implementation of the Bundle Level Method (see Lemaréchal et al., 1995)
 using JuMP, ..Utilitaries, LinearAlgebra, Gurobi
+
 function BundleLevelMethod(instance, initial_prices, niter, alpha, verbose = -1)
     T = length(instance.Load)
     iterates = [initial_prices]
     fun_iterates = Array([])
 
     UpperBound, LowerBound = Inf, - Inf
-
+    UpperBounds = [UpperBound]
+    LowerBounds = [LowerBound]
     model_update_lb = JuMP.direct_model(Gurobi.Optimizer(GRB_ENV[]))
     set_silent(model_update_lb)
     set_optimizer_attributes(model_update_lb, "MIPGap" => 0, "MIPGapAbs" => 1e-8)
@@ -41,6 +43,8 @@ function BundleLevelMethod(instance, initial_prices, niter, alpha, verbose = -1)
         @objective(model_projection, Min, sum((ProjPrice[t] - iterates[i][t])^2 for t=1:T))
         optimize!(model_projection)
         push!(iterates, value.(ProjPrice))
+        push!(UpperBounds, UpperBound)
+        push!(LowerBounds, LowerBound)
     end
     return last(iterates), iterates, fun_iterates
 end
@@ -65,7 +69,7 @@ function tOptimal(instance, initial_prices, alpha, verbose = 1)
 
     time_vector = [0.]
     idx = 1
-    while UpperBound - LowerBound >= 150
+    while UpperBound - LowerBound >= 50
         if verbose > 0
             @info "[BLM: Iteration $idx ; Gap = $(UpperBound - LowerBound)]"
         end
@@ -116,7 +120,8 @@ function tBundleLevelMethod(instance, initial_prices, budget, alpha, verbose = -
     model_projection = JuMP.direct_model(Gurobi.Optimizer(GRB_ENV[]))
     set_silent(model_projection)
     set_optimizer_attributes(model_projection, "MIPGap" => 0, "MIPGapAbs" => 1e-8)
-
+    UpperBounds = Float64[]
+    LowerBounds = Float64[]
     time_vector = [0.]
     idx = 1
     while time_vector[end] <= budget
@@ -147,6 +152,8 @@ function tBundleLevelMethod(instance, initial_prices, budget, alpha, verbose = -
         end
         push!(time_vector, it_time + time_vector[end])
         idx = idx + 1
+        push!(UpperBounds, UpperBound)
+        push!(LowerBounds, LowerBound)
     end
     @info "UB = $(UpperBound), LB = $(LowerBound), UB-LB = $(UpperBound - LowerBound)"
     return last(iterates), iterates, fun_iterates, time_vector

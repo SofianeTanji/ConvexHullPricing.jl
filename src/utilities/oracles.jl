@@ -41,7 +41,7 @@ function Matching(instance)
     @constraint(model, ConstrRampUp[gen=1:NbGen, t=1:T+1], Varpbar[gen, t] - Varp[gen, t - 1] <= RampUp[gen] * Varu[gen,t - 1] + StartUp[gen] * Varv[gen, t])
     @constraint(model, ConstrRampDown[gen=1:NbGen, t=1:T+1], Varpbar[gen, t - 1] - Varp[gen, t] <= RampDown[gen] * Varu[gen, t] + ShutDown[gen] * Varw[gen, t])
 
-    @objective(model, Min, sum(sum(NoLoadConsumption[gen] * MarginalCost[gen] * Varu[gen, t] + FixedCost[gen] * Varv[gen, t] + MarginalCost[gen] * Varp[gen, t] for t=1:T) for gen=1:NbGen) - LostLoad * sum(VarL[t] for t=1:T))
+    @objective(model, Min, sum(sum(NoLoadConsumption[gen] * Varu[gen, t] + FixedCost[gen] * Varv[gen, t] + MarginalCost[gen] * Varp[gen, t] for t=1:T) for gen=1:NbGen) + LostLoad * sum(L[t] - VarL[t] for t=1:T))
     optimize!(model)
     
     ValU, ValV, ValW, ValP, ValPbar, ValL = value.(Varu).data, value.(Varv).data, value.(Varw).data, value.(Varp).data, value.(Varpbar).data, value.(VarL)
@@ -88,7 +88,7 @@ function GetMShift(instance)
     @constraint(model, ConstrRampUp[gen=1:NbGen, t=1:T+1], Varpbar[gen, t] - Varp[gen, t - 1] <= RampUp[gen] * Varu[gen,t - 1] + StartUp[gen] * Varv[gen, t])
     @constraint(model, ConstrRampDown[gen=1:NbGen, t=1:T+1], Varpbar[gen, t - 1] - Varp[gen, t] <= RampDown[gen] * Varu[gen, t] + ShutDown[gen] * Varw[gen, t])
 
-    @objective(model, Min, sum(sum(NoLoadConsumption[gen] * MarginalCost[gen] * Varu[gen, t] + FixedCost[gen] * Varv[gen, t] + MarginalCost[gen] * Varp[gen, t] for t=1:T) for gen=1:NbGen) - LostLoad * sum(VarL[t] for t=1:T))
+    @objective(model, Min, sum(sum(NoLoadConsumption[gen] * Varu[gen, t] + FixedCost[gen] * Varv[gen, t] + MarginalCost[gen] * Varp[gen, t] for t=1:T) for gen=1:NbGen) + LostLoad * sum(L[t] - VarL[t] for t=1:T))
     optimize!(model)
     
     U = value.(model[:Varu]).data
@@ -176,7 +176,7 @@ function ExtendedFormulation(instance)
     @variable(model, VarL[t=1:T], lower_bound = 0)
     @constraint(model, [t=1:T], VarL[t] <= L[t])
 
-    @objective(model, Min, sum(sum(NoLoadConsumption[gen] * MarginalCost[gen] * Varu[gen, t] + FixedCost[gen] * Varv[gen, t] + MarginalCost[gen] * VarpTime[gen, t] for t=1:T) for gen=1:NbGen) - LostLoad * sum(VarL[t] for t=1:T))
+    @objective(model, Min, sum(sum(NoLoadConsumption[gen] * Varu[gen, t] + FixedCost[gen] * Varv[gen, t] + MarginalCost[gen] * VarpTime[gen, t] for t=1:T) for gen=1:NbGen) + LostLoad * sum(L[t] - VarL[t] for t=1:T))
 
     @constraint(model, loads[t=1:T], sum(VarpTime[g, t] for g=1:NbGen) == VarL[t]) # Balance constraint
 
@@ -249,7 +249,7 @@ function LP_Relaxation(instance)
     @constraint(model, ConstrRampUp[gen=1:NbGen, t=1:T+1], Varpbar[gen, t] - Varp[gen, t - 1] <= RampUp[gen] * Varu[gen,t - 1] + StartUp[gen] * Varv[gen, t])
     @constraint(model, ConstrRampDown[gen=1:NbGen, t=1:T+1], Varpbar[gen, t - 1] - Varp[gen, t] <= RampDown[gen] * Varu[gen, t] + ShutDown[gen] * Varw[gen, t])
 
-    @objective(model, Min, sum(sum(NoLoadConsumption[gen] * MarginalCost[gen] * Varu[gen, t] + FixedCost[gen] * Varv[gen, t] + MarginalCost[gen] * Varp[gen, t] for t=1:T) for gen=1:NbGen) - LostLoad * sum(VarL[t] for t=1:T))
+    @objective(model, Min, sum(sum(NoLoadConsumption[gen] * Varu[gen, t] + FixedCost[gen] * Varv[gen, t] + MarginalCost[gen] * Varp[gen, t] for t=1:T) for gen=1:NbGen) + LostLoad * sum(L[t] - VarL[t] for t=1:T))
     optimize!(model)
     
     prices = dual.(loads) # prices = ProjBox(dual.(loads), PCD, PCU)
@@ -296,7 +296,7 @@ function GetShift(instance)
     @constraint(model, ConstrRampUp[gen=1:NbGen, t=1:T+1], Varpbar[gen, t] - Varp[gen, t - 1] <= RampUp[gen] * Varu[gen,t - 1] + StartUp[gen] * Varv[gen, t])
     @constraint(model, ConstrRampDown[gen=1:NbGen, t=1:T+1], Varpbar[gen, t - 1] - Varp[gen, t] <= RampDown[gen] * Varu[gen, t] + ShutDown[gen] * Varw[gen, t])
 
-    @objective(model, Min, sum(sum(NoLoadConsumption[gen] * MarginalCost[gen] * Varu[gen, t] + FixedCost[gen] * Varv[gen, t] + MarginalCost[gen] * Varp[gen, t] for t=1:T) for gen=1:NbGen) - LostLoad * sum(VarL[t] for t=1:T))
+    @objective(model, Min, sum(sum(NoLoadConsumption[gen] * Varu[gen, t] + FixedCost[gen] * Varv[gen, t] + MarginalCost[gen] * Varp[gen, t] for t=1:T) for gen=1:NbGen) + LostLoad * (L[t] - sum(VarL[t] for t=1:T)))
     optimize!(model)
 
     U = value.(model[:Varu]).data
@@ -348,7 +348,7 @@ function LagrangianFunction(instance, prices)
     @constraint(model, ConstrRampUp[gen=1:NbGen, t=1:T+1], Varpbar[gen, t] - Varp[gen, t - 1] <= RampUp[gen] * Varu[gen,t - 1] + StartUp[gen] * Varv[gen, t])
     @constraint(model, ConstrRampDown[gen=1:NbGen, t=1:T+1], Varpbar[gen, t - 1] - Varp[gen, t] <= RampDown[gen] * Varu[gen, t] + ShutDown[gen] * Varw[gen, t])
 
-    @objective(model, Min, sum(sum(NoLoadConsumption[gen] * MarginalCost[gen] * Varu[gen, t] + FixedCost[gen] * Varv[gen, t] + MarginalCost[gen] * Varp[gen, t] for t=1:T) for gen=1:NbGen) - LostLoad * sum(VarL[t] for t=1:T) - sum(prices[t] * (sum(Varp[gen, t] for gen=1:NbGen) - VarL[t]) for t=1:T))
+    @objective(model, Min, sum(sum(NoLoadConsumption[gen] * Varu[gen, t] + FixedCost[gen] * Varv[gen, t] + MarginalCost[gen] * Varp[gen, t] for t=1:T) for gen=1:NbGen) + LostLoad * (L[t] - sum(VarL[t] for t=1:T)) - sum(prices[t] * (sum(Varp[gen, t] for gen=1:NbGen) - VarL[t]) for t=1:T))
     optimize!(model)
 
     Varu, Varv, Varw, Varp, Varpbar, VarL = value.(Varu), value.(Varv), value.(Varw), value.(Varp), value.(Varpbar), value.(VarL)   
@@ -379,7 +379,7 @@ function exact_oracle(instance, prices)
     Threads.@threads for gen=1:NbGen
         model = JuMP.direct_model(Gurobi.Optimizer(GRB_ENV[]))
         set_silent(model)
-        set_optimizer_attributes(model, "MIPGap" => 0, "MIPGapAbs" => 1e-8)
+        set_optimizer_attributes(model, "MIPGap" => 0, "MIPGapAbs" => 0)
 
         @variable(model, Varp[t=0:T+1], lower_bound = 0)
         @variable(model, Varpbar[t=0:T+1], lower_bound = 0)
@@ -399,7 +399,7 @@ function exact_oracle(instance, prices)
         @constraint(model, ConstrGenLimits3[t=0:T+1], Varpbar[t] <= MaxRunCapacity[gen] * Varu[t])
         @constraint(model, ConstrRampUp[t=1:T+1], Varpbar[t] - Varp[t - 1] <= RampUp[gen] * Varu[t - 1] + StartUp[gen] * Varv[t])
         @constraint(model, ConstrRampDown[t=1:T+1], Varpbar[t - 1] - Varp[t] <= RampDown[gen] * Varu[t] + ShutDown[gen] * Varw[t])
-        @objective(model, Min, sum(NoLoadConsumption[gen] * MarginalCost[gen] * Varu[t] + FixedCost[gen] * Varv[t] + MarginalCost[gen] * Varp[t] - (LostLoad / NbGen) * VarL[t] - prices[t] * (Varp[t] - (VarL[t]/NbGen)) for t=1:T))
+        @objective(model, Min, sum(NoLoadConsumption[gen] * Varu[t] + FixedCost[gen] * Varv[t] + MarginalCost[gen] * Varp[t] + (LostLoad / NbGen) * (L[t] - VarL[t]) - prices[t] * (Varp[t] - (VarL[t]/NbGen)) for t=1:T))
         optimize!(model)
         
         ValL = value.(model[:VarL])
@@ -457,7 +457,7 @@ function stochastic_oracle(instance, prices, batchsize)
         @constraint(model, ConstrRampUp[t=1:T+1], Varpbar[t] - Varp[t - 1] <= RampUp[gen] * Varu[t - 1] + StartUp[gen] * Varv[t])
         @constraint(model, ConstrRampDown[t=1:T+1], Varpbar[t - 1] - Varp[t] <= RampDown[gen] * Varu[t] + ShutDown[gen] * Varw[t])
 
-        @objective(model, Min, sum(NoLoadConsumption[gen] * MarginalCost[gen] * Varu[t] + FixedCost[gen] * Varv[t] + MarginalCost[gen] * Varp[t] - (LostLoad / NbGen) * VarL[t] - prices[t] * (Varp[t] - (VarL[t]/NbGen)) for t=1:T))
+        @objective(model, Min, sum(NoLoadConsumption[gen] * Varu[t] + FixedCost[gen] * Varv[t] + MarginalCost[gen] * Varp[t] + (LostLoad / NbGen) * (L[t] - VarL[t]) - prices[t] * (Varp[t] - (VarL[t]/NbGen)) for t=1:T))
         optimize!(model)
 
         ObjOracle += objective_value(model)
@@ -513,7 +513,7 @@ function exact_smooth_oracle(instance, prices, smoothing_parameter)
         @constraint(model, ConstrRampDown[t=1:T+1], Varpbar[t - 1] - Varp[t] <= RampDown[gen] * Varu[t] + ShutDown[gen] * Varw[t])
 
         prox = sum(Varp[t]^2 + Varpbar[t]^2 + Varu[t]^2 + Varv[t]^2 + Varw[t]^2 + VarL[t]^2 for t=1:T)
-        @objective(model, Min, sum(NoLoadConsumption[gen] * MarginalCost[gen] * Varu[t] + FixedCost[gen] * Varv[t] + MarginalCost[gen] * Varp[t] - (LostLoad / NbGen) * VarL[t] - prices[t] * (Varp[t] - (VarL[t]/NbGen)) + (smoothing_parameter / 2) * prox for t=1:T))
+        @objective(model, Min, sum(NoLoadConsumption[gen] * Varu[t] + FixedCost[gen] * Varv[t] + MarginalCost[gen] * Varp[t] + (LostLoad / NbGen) * (L[t] - VarL[t]) - prices[t] * (Varp[t] - (VarL[t]/NbGen)) + (smoothing_parameter / 2) * prox for t=1:T))
         optimize!(model)
 
         ObjOracle += objective_value(model)
@@ -574,7 +574,7 @@ function exact_translate_smooth_oracle(instance, prices, smoothing_parameter, sh
         @constraint(model, ConstrRampDown[t=1:T+1], Varpbar[t - 1] - Varp[t] <= RampDown[gen] * Varu[t] + ShutDown[gen] * Varw[t])
 
         prox = sum((Varp[t] - shiftP[t])^2 + (Varpbar[t] - shiftPbar[t])^2 + (Varu[t]-shiftU[t])^2 + (Varv[t] - shiftV[t])^2 + (Varw[t] - shiftW[t])^2 + (VarL[t] - shiftL[t])^2 for t=1:T)
-        @objective(model, Min, sum(NoLoadConsumption[gen] * MarginalCost[gen] * Varu[t] + FixedCost[gen] * Varv[t] + MarginalCost[gen] * Varp[t] - (LostLoad / NbGen) * VarL[t] - prices[t] * (Varp[t] - (VarL[t]/NbGen)) + (smoothing_parameter / 2) * prox for t=1:T))
+        @objective(model, Min, sum(NoLoadConsumption[gen] * Varu[t] + FixedCost[gen] * Varv[t] + MarginalCost[gen] * Varp[t] + (LostLoad / NbGen) * (L[t] - VarL[t]) - prices[t] * (Varp[t] - (VarL[t]/NbGen)) + (smoothing_parameter / 2) * prox for t=1:T))
         optimize!(model)
 
         ObjOracle += objective_value(model)

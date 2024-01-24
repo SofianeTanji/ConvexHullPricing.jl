@@ -294,13 +294,6 @@ function ColumnAndRowGeneration(instance, niter, eps)
 		JuMP.fix(model[:Varp][g, 0], 0; force = true)
 		JuMP.fix(model[:Varpbar][g, 0], 0; force = true)
 	end
-	for g=1:NbGen
-		JuMP.fix(model[:Varu][g, T + 1], 0; force = true)
-		JuMP.fix(model[:Varv][g, T + 1], 0; force = true)
-		JuMP.fix(model[:Varw][g, T + 1], 0; force = true)
-		JuMP.fix(model[:Varp][g, T + 1], 0; force = true)
-		JuMP.fix(model[:Varpbar][g, T + 1], 0; force = true)
-	end
 
 	@objective(model, Min, sum(sum(NoLoadConsumption[g] * MarginalCost[g] * model[:Varu][g, t] + FixedCost[g] * model[:Varv][g, t] + MarginalCost[g] * model[:Varp][g, t] for t=1:T) for g=1:NbGen) - LostLoad * sum(model[:VarL][t] for t=1:T))
     optimize!(model)
@@ -486,7 +479,7 @@ function ColumnAndRowGeneration(instance, niter, eps)
 	return Prices[end], Prices, arrObjPricing
 end
 
-function tCRG(instance, budget, eps)
+function tCRG(instance, budget, eps, verbose = -1)
 	# Unzip instance
     MinRunCapacity = instance.ThermalGen.MinRunCapacity
     MaxRunCapacity = instance.ThermalGen.MaxRunCapacity
@@ -527,7 +520,7 @@ function tCRG(instance, budget, eps)
     @constraint(model, ConstrGenLimits3[g=1:NbGen, t=0:T+1], Varpbar[g, t] <= MaxRunCapacity[g] * Varu[g, t])
     @constraint(model, ConstrRampUp[g=1:NbGen, t=1:T+1], Varpbar[g, t] - Varp[g, t - 1] <= RampUp[g] * Varu[g,t - 1] + StartUp[g] * Varv[g, t])
     @constraint(model, ConstrRampDown[g=1:NbGen, t=1:T+1], Varpbar[g, t - 1] - Varp[g, t] <= RampDown[g] * Varu[g, t] + ShutDown[g] * Varw[g, t])
-
+	
 	for g=1:NbGen
 		JuMP.fix(model[:Varu][g,0], 0; force = true)
 		JuMP.fix(model[:Varv][g,0], 0; force = true)
@@ -535,7 +528,6 @@ function tCRG(instance, budget, eps)
 		JuMP.fix(model[:Varp][g,0], 0; force = true)
 		JuMP.fix(model[:Varpbar][g,0], 0; force = true)
 	end
-
 	@objective(model, Min, sum(sum(NoLoadConsumption[g] * MarginalCost[g] * model[:Varu][g, t] + FixedCost[g] * model[:Varv][g, t] + MarginalCost[g] * model[:Varp][g, t] for t=1:T) for g=1:NbGen) - LostLoad * sum(model[:VarL][t] for t=1:T))
 	optimize!(model)
 	MatchingU = value.(model[:Varu]).data
@@ -545,7 +537,9 @@ function tCRG(instance, budget, eps)
 	else
 		MatchingU = MatchingU[2:T+1]
 	end	
-	@info " set T"
+	if verbose > 0
+		@info " set T"
+	end
 	(A,B, NbIntervalsGen) = set_T(UpTime, T, NbGen)
 	addedA = copy(A)
 	addedB = copy(B)
@@ -555,7 +549,9 @@ function tCRG(instance, budget, eps)
 	RestrictedModel = JuMP.direct_model(Gurobi.Optimizer(GRB_ENV[]))
     set_silent(RestrictedModel)
 	set_optimizer_attribute(RestrictedModel, "Threads", 8)
-	@info "create restricted model"
+	if verbose > 0
+		@info "create restricted model"
+	end
 	@variable(RestrictedModel, 0 <= Varp[g=1:NbGen, i=1:addedNbIntervals[g], t=0:T+1])
 	@variable(RestrictedModel, 0 <= Varpbar[g=1:NbGen, i=1:addedNbIntervals[g], t=0:T+1])
 	@variable(RestrictedModel, 0 <= Vargamma[g=1:NbGen, i=1:addedNbIntervals[g]])
@@ -591,7 +587,9 @@ function tCRG(instance, budget, eps)
 			CountGamma += 1
 		end
 	end
-	@info "fdp"
+	if verbose > 0
+		@info "fdp"
+	end
 	# Feasible Dispatch Polytope
 	@constraint(RestrictedModel, no_production[g=1:NbGen, i=1:addedNbIntervals[g], t=0:T+1; (t<addedA[g,i] || t>addedB[g,i])], DictP[g,i,t] <= 0)
 	@constraint(RestrictedModel, min_output[g=1:NbGen, i=1:addedNbIntervals[g], t=addedA[g,i]:addedB[g,i] ], -DictP[g,i,t] <= -DictGamma[g,i] * MinRunCapacity[g])
@@ -611,15 +609,19 @@ function tCRG(instance, budget, eps)
 	@constraint(RestrictedModel, shutdown_status[g=1:NbGen, t=0:T+1], sum(DictGamma[g,i] for i=1:addedNbIntervals[g] if (t == addedB[g,i]+1)) - Varw[g,t] == 0)
 	
 	@constraint(RestrictedModel, loads[t=1:T], sum( VarpTime[g,t] for g=1:NbGen) - VarL[t] == 0)
-	@info "fixing constraints"
-	for g=1:NbGen
-		JuMP.fix(RestrictedModel[:Varu][g,0], 0; force = true)
-		JuMP.fix(RestrictedModel[:Varv][g,0], 0; force = true)
-		JuMP.fix(RestrictedModel[:Varw][g,0], 0; force = true)
-		JuMP.fix(RestrictedModel[:VarpTime][g,0], 0; force = true)
-		JuMP.fix(RestrictedModel[:VarpbarTime][g,0], 0; force = true)
+	if verbose > 0
+		@info "fixing constraints"
 	end
-	@info "dexfining objective"
+	for g=1:NbGen
+		JuMP.fix(RestrictedModel[:Varu][g, 0], 0; force = true)
+		JuMP.fix(RestrictedModel[:Varv][g, 0], 0; force = true)
+		JuMP.fix(RestrictedModel[:Varw][g, 0], 0; force = true)
+		JuMP.fix(RestrictedModel[:VarpTime][g, 0], 0; force = true)
+		JuMP.fix(RestrictedModel[:VarpbarTime][g, 0], 0; force = true)
+	end
+	if verbose > 0
+		@info "dexfining objective"
+	end
 	@objective(RestrictedModel, Min, sum(sum(NoLoadConsumption[g] * MarginalCost[g] * RestrictedModel[:Varu][g, t] + FixedCost[g] * RestrictedModel[:Varv][g, t] + MarginalCost[g] * RestrictedModel[:VarpTime][g, t] for t=1:T) for g=1:NbGen) - LostLoad * sum(RestrictedModel[:VarL][t] for t=1:T))
 
 	
@@ -631,8 +633,10 @@ function tCRG(instance, budget, eps)
 
 	time_vector = [0.]
     iter = 1
-	@info "Starting iterations"
-    while time_vector[end] <= budget
+	if verbose > 0
+		@info "Starting iterations"
+    end
+	while time_vector[end] <= budget
 		@info "Iteration $iter"
 		it_time = @elapsed begin
 		# Solve Restricted Problem
@@ -644,7 +648,9 @@ function tCRG(instance, budget, eps)
 		# Solve Pricing Problem
 		@objective(model, Min, sum(sum(NoLoadConsumption[g] * MarginalCost[g] * model[:Varu][g, t] + FixedCost[g] * model[:Varv][g, t] + MarginalCost[g] * model[:Varp][g, t] for t=1:T) for g=1:NbGen) - LostLoad * sum(model[:VarL][t] for t=1:T) - sum(Price[t] * (sum(model[:Varp][g, t] for g=1:NbGen) - model[:VarL][t]) for t=1:T))
 		my_time = @elapsed begin optimize!(model) end
-		@info "Optimizing in iteration $iter took $my_time"
+		if verbose > 0
+			@info "Optimizing in iteration $iter took $my_time"
+		end
 		ObjPricing = objective_value(model)
 		push!(arrObjPricing, ObjPricing)
 		PricingU = value.(model[:Varu]).data
