@@ -23,21 +23,23 @@ BUDGET = 15 * 60
 # METHOD 1 : Polyak Method
 function RunPolyak()
   @info "Polyak Method"
+  _, _, _, _ = OPT.tPolyakMethod(BEinstances[1], zeros(96), 0.01, 1.)
+  @info "Precompilation done."
   for (idx, instance) in enumerate(BEinstances)
     @info "Instance BE #$idx - Running for 15 minutes."
     X0 = UT.LP_Relaxation(instance) # First iterate
-    F_star = maximum(load_object("results//optimal_values//NewOptRunBE$(idx).jld2")[3]) # Parameter
+    F_star = maximum(load_object("results//optimal_values//NewRefinedOptRunBE$(idx).jld2")[3]) # Parameter
     Xstar, Iterates, FunIterates, TimeVector = OPT.tPolyakMethod(instance, X0, BUDGET, F_star)
     @info "Done. Saving ..."
-    save_object("results//15min_runs//PolyakMethodBE$(idx).jld2", [Xstar, Iterates, FunIterates, TimeVector])
+    save_object("results//15min_runs//nPolyakMethodBE$(idx).jld2", [Xstar, Iterates, FunIterates, TimeVector])
   end
   for (idx, instance) in enumerate(CAinstances)
     @info "Instance CA #$idx - Running for 15 minutes."
     X0 = UT.LP_Relaxation(instance) # First iterate
-    F_star = maximum(load_object("results//optimal_values//NewOptRunCA$(idx).jld2")[3]) # Parameter
+    F_star = maximum(load_object("results//optimal_values//NewRefinedOptRunCA$(idx).jld2")[3]) # Parameter
     Xstar, Iterates, FunIterates, TimeVector = OPT.tPolyakMethod(instance, X0, BUDGET, F_star)
     @info "Done. Saving ..."
-    save_object("results//15min_runs//PolyakMethodCA$(idx).jld2", [Xstar, Iterates, FunIterates, TimeVector])
+    save_object("results//15min_runs//nPolyakMethodCA$(idx).jld2", [Xstar, Iterates, FunIterates, TimeVector])
   end
 end
 # METHOD 2 : D-Adaptation
@@ -64,18 +66,20 @@ end
 # METHOD 3 : BLM
 function RunBLM()
   @info "Bundle Level Method"
+  Xstar, Iterates, FunIterates, TimeVector = OPT.tBundleLevelMethod(BEinstances[1], zeros(96), 1., 0.9)
+  @info "Compiled. Now running."
   for (idx, instance) in enumerate(BEinstances)
-    @info "Instance BE #$idx - Running for 15 minutes."
-    X0 = UT.LP_Relaxation(instance) # First iterate
-    α = 0.2 # Parameter
-    Xstar, Iterates, FunIterates, TimeVector = OPT.tBundleLevelMethod(instance, X0, BUDGET, α)
-    @info "Done. Saving ..."
-    save_object("results//15min_runs//BundleLevelMethodBE$(idx).jld2", [Xstar, Iterates, FunIterates, TimeVector])
+      @info "Instance BE #$idx - Running for 15 minutes."
+      X0 = UT.LP_Relaxation(instance) # First iterate
+      α = 0.9 # Parameter
+      Xstar, Iterates, FunIterates, TimeVector = OPT.tBundleLevelMethod(instance, X0, BUDGET, α)
+      @info "Done. Saving ..."
+      save_object("results//15min_runs//BundleLevelMethodBE$(idx).jld2", [Xstar, Iterates, FunIterates, TimeVector])
   end
   for (idx, instance) in enumerate(CAinstances)
     @info "Instance CA #$idx - Running for 15 minutes."
     X0 = UT.LP_Relaxation(instance) # First iterate
-    α = 0.3 # Parameter
+    α = 0.9 # Parameter
     Xstar, Iterates, FunIterates, TimeVector = OPT.tBundleLevelMethod(instance, X0, BUDGET, α)
     @info "Done. Saving ..."
     save_object("results//15min_runs//BundleLevelMethodCA$(idx).jld2", [Xstar, Iterates, FunIterates, TimeVector])
@@ -123,6 +127,26 @@ function RunSUBG()
   end
 end
 
+function RunFGM()
+  @info "FGM"
+  for (idx, instance) in enumerate(BEinstances)
+    @info "Instance BE #$idx - Running for 15 minutes."
+    X0 = UT.LP_Relaxation(instance) # First iterate
+    α = 1e-4 # Parameter
+    Xstar, Iterates, FunIterates, TimeVector = OPT.tShiftedFGM(instance, X0, BUDGET, α, 1e-8)
+    @info "Done. Saving ..."
+    save_object("results//15min_runs//FGMBE$(idx).jld2", [Xstar, Iterates, FunIterates, TimeVector])
+  end
+  for (idx, instance) in enumerate(CAinstances)
+      @info "Instance CA #$idx - Running for 15 minutes."
+      X0 = UT.LP_Relaxation(instance) # First iterate
+      α = 1e-5 # Parameter
+      Xstar, Iterates, FunIterates, TimeVector = OPT.tShiftedFGM(instance, X0, BUDGET, α, 1e-8)
+      @info "Done. Saving ..."
+      save_object("results//15min_runs//FGMCA$(idx).jld2", [Xstar, Iterates, FunIterates, TimeVector])
+  end
+end
+
 function RunESTPOL()
   @info "EST POL"
   for (idx, instance) in enumerate(BEinstances)
@@ -140,5 +164,71 @@ function RunESTPOL()
     Xstar, Iterates, FunIterates, TimeVector = OPT.tEstimatedPolyak(instance, X0, BUDGET, α)
     @info "Done. Saving ..."
     save_object("results//15min_runs//SubG-EP-CA$(idx).jld2", [Xstar, Iterates, FunIterates, TimeVector])
+  end
+end
+
+# METHOD 3 : BLM
+function RunBPLM_L()
+  @info "Bundle Proximal Level Method - Last Iterate"
+  for (idx, instance) in enumerate(BEinstances)
+    @info "Instance BE #$idx - Running for 15 minutes."
+    X0 = UT.LP_Relaxation(instance) # First iterate
+    α = 0.95 # Parameter
+    Xstar, Iterates, FunIterates, TimeVector = OPT.tBPLM(instance, X0, BUDGET, α)
+    @info "Done. Saving ..."
+    save_object("results//15min_runs//BundleProximalLevelMethod-L-BE$(idx).jld2", [Xstar, Iterates, FunIterates, TimeVector])
+  end
+  for (idx, instance) in enumerate(CAinstances)
+    @info "Instance CA #$idx - Running for 15 minutes."
+    X0 = UT.LP_Relaxation(instance) # First iterate
+    α = 0.9 # Parameter
+    Xstar, Iterates, FunIterates, TimeVector = OPT.tBPLM(instance, X0, BUDGET, α)
+    @info "Done. Saving ..."
+    save_object("results//15min_runs//BundleProximalLevelMethod-L-CA$(idx).jld2", [Xstar, Iterates, FunIterates, TimeVector])
+  end
+end
+
+function RunDW()
+  @info "Column Generation"
+  Xstar, Iterates, FunIterates, TimeVector = OPT.tColumnGeneration(BEinstances[1], zeros(96), 1., 1e-7)
+  @info "Compiled. Now starting."
+  verb = 1
+  for (idx, instance) in enumerate(BEinstances)
+    @info "Instance BE #$idx - Running for 15 minutes."
+    X0 = UT.LP_Relaxation(instance) # First iterate
+    α = 1e-7 # Parameter
+    Xstar, Iterates, FunIterates, TimeVector = OPT.tColumnGeneration(instance, X0, BUDGET, α, verb)
+    @info "Done. Saving ..."
+    save_object("results//15min_runs//ColumnGeneration-BE$(idx).jld2", [Xstar, Iterates, FunIterates, TimeVector])
+  end
+  for (idx, instance) in enumerate(CAinstances)
+    @info "Instance CA #$idx - Running for 15 minutes."
+    X0 = UT.LP_Relaxation(instance) # First iterate
+    α = 1e-7 # Parameter
+    Xstar, Iterates, FunIterates, TimeVector = OPT.tColumnGeneration(instance, X0, BUDGET, α, verb)
+    @info "Done. Saving ..."
+    save_object("results//15min_runs//ColumnGeneration-CA$(idx).jld2", [Xstar, Iterates, FunIterates, TimeVector])
+  end
+end
+
+function RunLSUBG()
+  @info "Last-iterate optimal subgradient method"
+  Xstar, Iterates, FunIterates, TimeVector = OPT.tlastSubgradientMethod(BEinstances[1], zeros(96), 1, 0.9)
+  @info "Compiled. Now running."
+  for (idx, instance) in enumerate(BEinstances)
+      @info "Instance BE #$idx - Running for 15 minutes."
+      X0 = UT.LP_Relaxation(instance) # First iterate
+      α = 40. # Parameter
+      Xstar, Iterates, FunIterates, TimeVector = OPT.tlastSubgradientMethod(instance, X0, 1200, α)
+      @info "Done. Saving ..."
+      save_object("results//15min_runs//LSUBGBE$(idx).jld2", [Xstar, Iterates, FunIterates, TimeVector])
+  end
+  for (idx, instance) in enumerate(CAinstances)
+    @info "Instance CA #$idx - Running for 15 minutes."
+    X0 = UT.LP_Relaxation(instance) # First iterate
+    α = 0.2 # Parameter
+    Xstar, Iterates, FunIterates, TimeVector = OPT.tlastSubgradientMethod(instance, X0, 400, α)
+    @info "Done. Saving ..."
+    save_object("results//15min_runs//LSUBGCA$(idx).jld2", [Xstar, Iterates, FunIterates, TimeVector])
   end
 end

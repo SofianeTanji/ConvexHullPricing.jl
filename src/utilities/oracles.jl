@@ -20,6 +20,7 @@ function Matching(instance)
 
     model = JuMP.direct_model(Gurobi.Optimizer(GRB_ENV[]))
     set_silent(model)
+    set_optimizer_attributes(model, "MIPGap" => 1e-3)
 
     @variable(model, Varp[g=1:NbGen, t=0:T+1], lower_bound = 0)
     @variable(model, Varpbar[g=1:NbGen, t=0:T+1], lower_bound = 0)
@@ -296,7 +297,7 @@ function GetShift(instance)
     @constraint(model, ConstrRampUp[gen=1:NbGen, t=1:T+1], Varpbar[gen, t] - Varp[gen, t - 1] <= RampUp[gen] * Varu[gen,t - 1] + StartUp[gen] * Varv[gen, t])
     @constraint(model, ConstrRampDown[gen=1:NbGen, t=1:T+1], Varpbar[gen, t - 1] - Varp[gen, t] <= RampDown[gen] * Varu[gen, t] + ShutDown[gen] * Varw[gen, t])
 
-    @objective(model, Min, sum(sum(NoLoadConsumption[gen] * Varu[gen, t] + FixedCost[gen] * Varv[gen, t] + MarginalCost[gen] * Varp[gen, t] for t=1:T) for gen=1:NbGen) + LostLoad * (L[t] - sum(VarL[t] for t=1:T)))
+    @objective(model, Min, sum(sum(NoLoadConsumption[gen] * Varu[gen, t] + FixedCost[gen] * Varv[gen, t] + MarginalCost[gen] * Varp[gen, t] for t=1:T) for gen=1:NbGen) + LostLoad * (sum(L[t] - VarL[t] for t=1:T)))
     optimize!(model)
 
     U = value.(model[:Varu]).data
@@ -379,7 +380,7 @@ function exact_oracle(instance, prices)
     Threads.@threads for gen=1:NbGen
         model = JuMP.direct_model(Gurobi.Optimizer(GRB_ENV[]))
         set_silent(model)
-        set_optimizer_attributes(model, "MIPGap" => 0, "MIPGapAbs" => 0)
+        set_optimizer_attributes(model, "MIPGap" => 1e-8, "MIPGapAbs" => 0)
 
         @variable(model, Varp[t=0:T+1], lower_bound = 0)
         @variable(model, Varpbar[t=0:T+1], lower_bound = 0)

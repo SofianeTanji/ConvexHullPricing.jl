@@ -22,7 +22,7 @@ instanceBE = BEinstances[8]
 instanceCA = CAinstances[1]
 X0BE = UT.LP_Relaxation(instanceBE)
 X0CA = UT.LP_Relaxation(instanceCA)
-Τ = 10 * 60.
+Τ = 3 * 60.
 
 # Method 1 : D-Adaptation
 function HPO_Coarse_DA()
@@ -62,29 +62,6 @@ function HPO_fine_DA()
   save_object("results//HPopt//FineDA-CA.jld2", FineResultsCA)
 end
 # HPO_fine_DA()
-
-# Method 2 : BLM
-function HPO_Coarse_BLM()
-  CoarseParameterRange = [0.2, 0.4, 0.6, 0.8]
-  CoarseResultsBE = []
-  @info "Running BE8"
-  for α in CoarseParameterRange
-    @info "Testing α = $α"
-    Xstar, Iterates, FunIterates, TimeVector = OPT.tBundleLevelMethod(instanceBE, X0BE, Τ, α)
-    push!(CoarseResultsBE, [α, Xstar, Iterates, FunIterates, TimeVector])
-  end
-  save_object("results//HPopt//CoarseBLM-BE.jld2", CoarseResultsBE)
-
-  #=CoarseResultsCA = []
-  @info "Running CA1"
-  for α in CoarseParameterRange
-    @info "Testing α = $α"
-    Xstar, Iterates, FunIterates, TimeVector = OPT.tDAdaptation(instanceCA, X0CA, Τ, α)
-    push!(CoarseResultsCA, [α, Xstar, Iterates, FunIterates, TimeVector])
-  end
-  save_object("results//HPopt//CoarseBLM-CA.jld2", CoarseResultsCA)=#
-end
-# HPO_Coarse_BLM()
 
 # Method 1 : DOWG
 function HPO_Coarse_DOWG()
@@ -144,29 +121,29 @@ function HPO_Coarse_SUBG_EP()
   save_object("results//HPopt//CoarseSUBG-EP-CA.jld2", CoarseResultsCA)
 end
 
-function HPO_Coarse_GD()
+function HPO_Coarse_LSG()
   CoarseParameterRange = [10.0^k for k = -4:0.5:5]
   CoarseResultsBE = []
   @info "Belgian"
   for α in CoarseParameterRange
     @info "Testing α = $α"
-    Xstar, Iterates, FunIterates, TimeVector = OPT.tEstimatedPolyak(instanceBE, X0BE, Τ, α)
+    Xstar, Iterates, FunIterates, TimeVector = OPT.tlastSubgradientMethod(instanceBE, X0BE, 900, α)
     push!(CoarseResultsBE, [α, Xstar, Iterates, FunIterates, TimeVector])
   end
-  save_object("results//HPopt//CoarseSUBG-EP-BE.jld2", CoarseResultsBE)
+  save_object("results//HPopt//CoarseLSG-BE.jld2", CoarseResultsBE)
 
   CoarseResultsCA = []
   @info "Californian"
   for α in CoarseParameterRange
     @info "Testing α = $α"
-    Xstar, Iterates, FunIterates, TimeVector = OPT.tEstimatedPolyak(instanceCA, X0CA, Τ, α)
+    Xstar, Iterates, FunIterates, TimeVector = OPT.tlastSubgradientMethod(instanceCA, X0CA, 600, α)
     push!(CoarseResultsCA, [α, Xstar, Iterates, FunIterates, TimeVector])
   end
-  save_object("results//HPopt//CoarseSUBG-EP-CA.jld2", CoarseResultsCA)
+  save_object("results//HPopt//CoarseLSG-CA.jld2", CoarseResultsCA)
 end
 
 function HPO_Coarse_BLM()
-  CoarseParameterRange = [k for k in LinRange(0.01, 0.95, 20)]
+  CoarseParameterRange = [k for k in LinRange(0.2, 0.98, 10)]
   CoarseResultsBE = []
   @info "Running BE8"
   for α in CoarseParameterRange
@@ -174,7 +151,7 @@ function HPO_Coarse_BLM()
     Xstar, Iterates, FunIterates, TimeVector = OPT.tBundleLevelMethod(instanceBE, X0BE, Τ, α)
     push!(CoarseResultsBE, [α, Xstar, Iterates, FunIterates, TimeVector])
   end
-  save_object("results//HPopt//CoarseBLM-BE.jld2", CoarseResultsBE)
+  save_object("results//HPopt//nCoarseBLM-BE.jld2", CoarseResultsBE)
 
   CoarseResultsCA = []
   @info "Running CA1"
@@ -183,7 +160,7 @@ function HPO_Coarse_BLM()
     Xstar, Iterates, FunIterates, TimeVector = OPT.tBundleLevelMethod(instanceCA, X0CA, Τ, α)
     push!(CoarseResultsCA, [α, Xstar, Iterates, FunIterates, TimeVector])
   end
-  save_object("results//HPopt//CoarseBLM-CA.jld2", CoarseResultsCA)
+  save_object("results//HPopt//nCoarseBLM-CA.jld2", CoarseResultsCA)
 end
 
 function HPO_Coarse_BPLM_B()
@@ -226,4 +203,26 @@ function HPO_Coarse_BPLM_L()
     push!(CoarseResultsCA, [α, Xstar, Iterates, FunIterates, TimeVector])
   end
   save_object("results//HPopt//CoarseBPLM-L-CA.jld2", CoarseResultsCA)
+end
+
+
+function HPO_Coarse_FGM()
+  CoarseParameterRange = [1e-6, 1e-5, 1e-4, 1e-3]
+  CoarseResultsBE = []
+  @info "Running BE8"
+  for α in CoarseParameterRange
+    @info "Testing α = $α"
+    Xstar, Iterates, FunIterates, TimeVector = OPT.tShiftedFGM(instanceBE, X0BE, Τ, α, 1e-8)
+    push!(CoarseResultsBE, [α, Xstar, Iterates, FunIterates, TimeVector])
+  end
+  save_object("results//HPopt//CoarseFGM-BE.jld2", CoarseResultsBE)
+
+  CoarseResultsCA = []
+  @info "Running CA1"
+  for α in CoarseParameterRange
+    @info "Testing α = $α"
+    Xstar, Iterates, FunIterates, TimeVector = OPT.tShiftedFGM(instanceCA, X0CA, Τ, α, 1e-8)
+    push!(CoarseResultsCA, [α, Xstar, Iterates, FunIterates, TimeVector])
+  end
+  save_object("results//HPopt//CoarseFGM-CA.jld2", CoarseResultsCA)
 end

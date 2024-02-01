@@ -8,8 +8,8 @@ module Optimizer
         return
     end
     
-    const PCU = 3000
-    const PCD = -500
+    const PCU = 300.
+    const PCD = -300.
     const PC = abs(PCU) + abs(PCD)
     include("dual_methods/BundleLevelMethod.jl")
     include("dual_methods/BundleProximalMethod.jl")

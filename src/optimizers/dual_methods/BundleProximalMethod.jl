@@ -1,8 +1,8 @@
 # Implementation of the Bundle Proximal Method (see Lemaréchal et al., 1995)
 using JuMP, ..Utilitaries, LinearAlgebra, Gurobi
 
-mPCD = 0.
-mPCU = 200.
+mPCD = -200.
+mPCU = 400.
 
 function BundleProximalMethod(instance, initial_prices, niter, α, stepsize, verbose = -1)
     T = length(instance.Load)

@@ -295,7 +295,7 @@ function ColumnAndRowGeneration(instance, niter, eps)
 		JuMP.fix(model[:Varpbar][g, 0], 0; force = true)
 	end
 
-	@objective(model, Min, sum(sum(NoLoadConsumption[g] * MarginalCost[g] * model[:Varu][g, t] + FixedCost[g] * model[:Varv][g, t] + MarginalCost[g] * model[:Varp][g, t] for t=1:T) for g=1:NbGen) - LostLoad * sum(model[:VarL][t] for t=1:T))
+	@objective(model, Min, sum(sum(NoLoadConsumption[g] * model[:Varu][g, t] + FixedCost[g] * model[:Varv][g, t] + MarginalCost[g] * model[:Varp][g, t] for t=1:T) for g=1:NbGen) - LostLoad * sum(model[:VarL][t] for t=1:T))
     optimize!(model)
 	MatchingU = value.(model[:Varu]).data
 	delete(model, loads)
@@ -380,7 +380,7 @@ function ColumnAndRowGeneration(instance, niter, eps)
 		JuMP.fix(RestrictedModel[:VarpbarTime][g,0], 0; force = true)
 	end
 
-	@objective(RestrictedModel, Min, sum(sum(NoLoadConsumption[g] * MarginalCost[g] * RestrictedModel[:Varu][g, t] + FixedCost[g] * RestrictedModel[:Varv][g, t] + MarginalCost[g] * RestrictedModel[:VarpTime][g, t] for t=1:T) for g=1:NbGen) - LostLoad * sum(RestrictedModel[:VarL][t] for t=1:T))
+	@objective(RestrictedModel, Min, sum(sum(NoLoadConsumption[g] * RestrictedModel[:Varu][g, t] + FixedCost[g] * RestrictedModel[:Varv][g, t] + MarginalCost[g] * RestrictedModel[:VarpTime][g, t] for t=1:T) for g=1:NbGen) - LostLoad * sum(RestrictedModel[:VarL][t] for t=1:T))
 
 	
 	# Start iterations
@@ -397,7 +397,7 @@ function ColumnAndRowGeneration(instance, niter, eps)
 		push!(Prices, Price)
 		push!(arrObjRestricted, ObjRestricted)
 		# Solve Pricing Problem
-		@objective(model, Min, sum(sum(NoLoadConsumption[g] * MarginalCost[g] * model[:Varu][g, t] + FixedCost[g] * model[:Varv][g, t] + MarginalCost[g] * model[:Varp][g, t] for t=1:T) for g=1:NbGen) - LostLoad * sum(model[:VarL][t] for t=1:T) - sum(Price[t] * (sum(model[:Varp][g, t] for g=1:NbGen) - model[:VarL][t]) for t=1:T))
+		@objective(model, Min, sum(sum(NoLoadConsumption[g] * model[:Varu][g, t] + FixedCost[g] * model[:Varv][g, t] + MarginalCost[g] * model[:Varp][g, t] for t=1:T) for g=1:NbGen) - LostLoad * sum(model[:VarL][t] for t=1:T) - sum(Price[t] * (sum(model[:Varp][g, t] for g=1:NbGen) - model[:VarL][t]) for t=1:T))
 		optimize!(model)
 		ObjPricing = objective_value(model)
 		push!(arrObjPricing, ObjPricing)
@@ -528,7 +528,7 @@ function tCRG(instance, budget, eps, verbose = -1)
 		JuMP.fix(model[:Varp][g,0], 0; force = true)
 		JuMP.fix(model[:Varpbar][g,0], 0; force = true)
 	end
-	@objective(model, Min, sum(sum(NoLoadConsumption[g] * MarginalCost[g] * model[:Varu][g, t] + FixedCost[g] * model[:Varv][g, t] + MarginalCost[g] * model[:Varp][g, t] for t=1:T) for g=1:NbGen) - LostLoad * sum(model[:VarL][t] for t=1:T))
+	@objective(model, Min, sum(sum(NoLoadConsumption[g] * model[:Varu][g, t] + FixedCost[g] * model[:Varv][g, t] + MarginalCost[g] * model[:Varp][g, t] for t=1:T) for g=1:NbGen) - LostLoad * sum(model[:VarL][t] for t=1:T))
 	optimize!(model)
 	MatchingU = value.(model[:Varu]).data
 	delete(model, loads)
@@ -622,7 +622,7 @@ function tCRG(instance, budget, eps, verbose = -1)
 	if verbose > 0
 		@info "dexfining objective"
 	end
-	@objective(RestrictedModel, Min, sum(sum(NoLoadConsumption[g] * MarginalCost[g] * RestrictedModel[:Varu][g, t] + FixedCost[g] * RestrictedModel[:Varv][g, t] + MarginalCost[g] * RestrictedModel[:VarpTime][g, t] for t=1:T) for g=1:NbGen) - LostLoad * sum(RestrictedModel[:VarL][t] for t=1:T))
+	@objective(RestrictedModel, Min, sum(sum(NoLoadConsumption[g] * RestrictedModel[:Varu][g, t] + FixedCost[g] * RestrictedModel[:Varv][g, t] + MarginalCost[g] * RestrictedModel[:VarpTime][g, t] for t=1:T) for g=1:NbGen) - LostLoad * sum(RestrictedModel[:VarL][t] for t=1:T))
 
 	
 	# Start iterations
@@ -646,7 +646,7 @@ function tCRG(instance, budget, eps, verbose = -1)
 		push!(Prices, Price)
 		push!(arrObjRestricted, ObjRestricted)
 		# Solve Pricing Problem
-		@objective(model, Min, sum(sum(NoLoadConsumption[g] * MarginalCost[g] * model[:Varu][g, t] + FixedCost[g] * model[:Varv][g, t] + MarginalCost[g] * model[:Varp][g, t] for t=1:T) for g=1:NbGen) - LostLoad * sum(model[:VarL][t] for t=1:T) - sum(Price[t] * (sum(model[:Varp][g, t] for g=1:NbGen) - model[:VarL][t]) for t=1:T))
+		@objective(model, Min, sum(sum(NoLoadConsumption[g] * model[:Varu][g, t] + FixedCost[g] * model[:Varv][g, t] + MarginalCost[g] * model[:Varp][g, t] for t=1:T) for g=1:NbGen) - LostLoad * sum(model[:VarL][t] for t=1:T) - sum(Price[t] * (sum(model[:Varp][g, t] for g=1:NbGen) - model[:VarL][t]) for t=1:T))
 		my_time = @elapsed begin optimize!(model) end
 		if verbose > 0
 			@info "Optimizing in iteration $iter took $my_time"
@@ -730,6 +730,9 @@ function tCRG(instance, budget, eps, verbose = -1)
 		push!(time_vector, it_time + time_vector[end])
 		iter += 1
 	end
-
-	return Prices[end], Prices, arrObjPricing, time_vector
+	f_iterates = Float64[]
+    for ρ in Prices
+        push!(f_iterates, Utilitaries.exact_oracle(instance, ρ)[1])
+    end
+	return Prices[end], Prices, f_iterates, time_vector
 end

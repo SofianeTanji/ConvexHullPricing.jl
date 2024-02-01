@@ -47,10 +47,10 @@ function ColumnGeneration(instance, initial_prices, niter, eps, verbose = -1)
         @constraint(model_subproblem, ConstrRampDown[t=1:T+1], Varpbar[t-1] - Varp[t] <= RampDown[gen]*Varu[t] + ShutDown[gen]*Varw[t])
 
         # Cost constraint
-        @constraint(model_subproblem, VarCost - sum(NoLoadConsumption[gen] * MarginalCost[gen] * Varu[t] + FixedCost[gen] * Varv[t] + MarginalCost[gen] * Varp[t] for t=1:T) == 0)
+        @constraint(model_subproblem, VarCost - sum(NoLoadConsumption[gen] * Varu[t] + FixedCost[gen] * Varv[t] + MarginalCost[gen] * Varp[t] for t=1:T) == 0)
 
         # Objective
-        @objective(model_subproblem, Min, sum(NoLoadConsumption[gen] * MarginalCost[gen] * Varu[t] + FixedCost[gen] * Varv[t] + MarginalCost[gen] * Varp[t] for t=1:T) - sum(price[t]*Varp[t] for t=1:T))
+        @objective(model_subproblem, Min, sum(NoLoadConsumption[gen] * Varu[t] + FixedCost[gen] * Varv[t] + MarginalCost[gen] * Varp[t] for t=1:T) - sum(price[t]*Varp[t] for t=1:T))
         subproblem = Utilitaries.SubProblem(model_subproblem, Varp, Varpbar, Varu, Varv, Varw, VarCost, ConstrLogical, ConstrMinUpTime, ConstrMinDownTime, ConstrGenLimits1, ConstrGenLimits2, ConstrGenLimits3, ConstrRampUp, ConstrRampDown)
         table_subproblems[gen] = subproblem
     end
@@ -79,13 +79,13 @@ function ColumnGeneration(instance, initial_prices, niter, eps, verbose = -1)
             ScheduleU[gen, ScheduleCounter[gen]] = MatchU[gen, 2:T+1]
             ScheduleV[gen, ScheduleCounter[gen]] = MatchV[gen, 2:T+1]
             ScheduleW[gen, ScheduleCounter[gen]] = MatchW[gen, 2:T+1]
-            ScheduleCost[gen, ScheduleCounter[gen]] = sum(NoLoadConsumption[gen] * MarginalCost[gen] * MatchU[gen, t] + FixedCost[gen] * MatchV[gen, t] + MarginalCost[gen] * MatchP[gen, t] for t=2:T+1)
+            ScheduleCost[gen, ScheduleCounter[gen]] = sum(NoLoadConsumption[gen] * MatchU[gen, t] + FixedCost[gen] * MatchV[gen, t] + MarginalCost[gen] * MatchP[gen, t] for t=2:T+1)
         else
             ScheduleP[gen, ScheduleCounter[gen]] = MatchP[2:T+1]
             ScheduleU[gen, ScheduleCounter[gen]] = MatchU[2:T+1]
             ScheduleV[gen, ScheduleCounter[gen]] = MatchV[2:T+1]
             ScheduleW[gen, ScheduleCounter[gen]] = MatchW[2:T+1]
-            ScheduleCost[gen, ScheduleCounter[gen]] = sum(NoLoadConsumption[gen] * MarginalCost[gen] * MatchU[t] + FixedCost[gen] * MatchV[t] + MarginalCost[gen] * MatchP[t] for t=2:T+1)
+            ScheduleCost[gen, ScheduleCounter[gen]] = sum(NoLoadConsumption[gen] * MatchU[t] + FixedCost[gen] * MatchV[t] + MarginalCost[gen] * MatchP[t] for t=2:T+1)
         end
     
     end
@@ -121,7 +121,7 @@ function ColumnGeneration(instance, initial_prices, niter, eps, verbose = -1)
         if verbose > 0
             @info "[CG: Iteration $iter]"
         end
-        @objective(RMP.model, Min, sum(sum(DictZ[gen, i] * ScheduleCost[gen, i] for i=1:ScheduleCounter[gen]) for gen=1:NbGen) - LostLoad*sum(VarL[t] for t=1:T))
+        @objective(RMP.model, Min, sum(sum(DictZ[gen, i] * ScheduleCost[gen, i] for i=1:ScheduleCounter[gen]) for gen=1:NbGen) - LostLoad * sum(L[t] - VarL[t] for t=1:T))
         optimize!(RMP.model)
         ObjMaster = objective_value(RMP.model)
         push!(ObjVect, ObjMaster)
@@ -136,7 +136,7 @@ function ColumnGeneration(instance, initial_prices, niter, eps, verbose = -1)
         StoppingCriterion = 1
         for gen=1:NbGen
             SubProblem = table_subproblems[gen]
-            @objective(SubProblem.model, Min, sum(NoLoadConsumption[gen] * MarginalCost[gen] * SubProblem.Varu[t] + FixedCost[gen] * SubProblem.Varv[t] + MarginalCost[gen] * SubProblem.Varp[t] for t=1:T) - sum(price[t] * SubProblem.Varp[t] for t=1:T))
+            @objective(SubProblem.model, Min, sum(NoLoadConsumption[gen] * SubProblem.Varu[t] + FixedCost[gen] * SubProblem.Varv[t] + MarginalCost[gen] * SubProblem.Varp[t] for t=1:T) - sum(price[t] * SubProblem.Varp[t] for t=1:T))
             optimize!(SubProblem.model)
             termination_status(SubProblem.model)
             ReducedCost = objective_value(SubProblem.model) - PiDual[gen]
@@ -152,7 +152,7 @@ function ColumnGeneration(instance, initial_prices, niter, eps, verbose = -1)
                 ScheduleU[gen, ScheduleCounter[gen]] = SubP[2:T+1]
                 ScheduleV[gen, ScheduleCounter[gen]] = SubP[2:T+1]
                 ScheduleW[gen, ScheduleCounter[gen]] = SubP[2:T+1]
-                ScheduleCost[gen, ScheduleCounter[gen]] = sum(NoLoadConsumption[gen] * MarginalCost[gen] * SubU[t] + FixedCost[gen] * SubV[t] + MarginalCost[gen] * SubP[t] for t=2:T+1)
+                ScheduleCost[gen, ScheduleCounter[gen]] = sum(NoLoadConsumption[gen] * SubU[t] + FixedCost[gen] * SubV[t] + MarginalCost[gen] * SubP[t] for t=2:T+1)
 
                 NewVarZ = @variable(RMP.model, [[gen], [ScheduleCounter[gen]]], lower_bound = 0, upper_bound = 1, base_name = "Z")
                 RMP.VarZ[gen, ScheduleCounter[gen]] = NewVarZ[gen, ScheduleCounter[gen]]
@@ -216,10 +216,10 @@ function tColumnGeneration(instance, initial_prices, budget, eps, verbose = -1)
         @constraint(model_subproblem, ConstrRampDown[t=1:T+1], Varpbar[t-1] - Varp[t] <= RampDown[gen]*Varu[t] + ShutDown[gen]*Varw[t])
 
         # Cost constraint
-        @constraint(model_subproblem, VarCost - sum(NoLoadConsumption[gen] * MarginalCost[gen] * Varu[t] + FixedCost[gen] * Varv[t] + MarginalCost[gen] * Varp[t] for t=1:T) == 0)
+        @constraint(model_subproblem, VarCost - sum(NoLoadConsumption[gen] * Varu[t] + FixedCost[gen] * Varv[t] + MarginalCost[gen] * Varp[t] for t=1:T) == 0)
 
         # Objective
-        @objective(model_subproblem, Min, sum(NoLoadConsumption[gen] * MarginalCost[gen] * Varu[t] + FixedCost[gen] * Varv[t] + MarginalCost[gen] * Varp[t] for t=1:T) - sum(price[t]*Varp[t] for t=1:T))
+        @objective(model_subproblem, Min, sum(NoLoadConsumption[gen] * Varu[t] + FixedCost[gen] * Varv[t] + MarginalCost[gen] * Varp[t] for t=1:T) - sum(price[t]*Varp[t] for t=1:T))
         subproblem = Utilitaries.SubProblem(model_subproblem, Varp, Varpbar, Varu, Varv, Varw, VarCost, ConstrLogical, ConstrMinUpTime, ConstrMinDownTime, ConstrGenLimits1, ConstrGenLimits2, ConstrGenLimits3, ConstrRampUp, ConstrRampDown)
         table_subproblems[gen] = subproblem
     end
@@ -233,7 +233,9 @@ function tColumnGeneration(instance, initial_prices, budget, eps, verbose = -1)
     ScheduleW = Dict()
     ScheduleCost = Dict()
     ScheduleCounter = Int64[0 for gen=1:NbGen]
-
+    if verbose > 0
+        @info "[CG: Computing initial feasible schedules.]"
+    end
     ## Initialisation
     matching = Utilitaries.Matching(instance)
     MatchU = matching.Varu
@@ -242,19 +244,22 @@ function tColumnGeneration(instance, initial_prices, budget, eps, verbose = -1)
     MatchP = matching.Varp
 
     for gen=1:NbGen
+        if verbose > 0
+            @info "[CG: Feasible schedule initial computation, generator $gen]"
+        end
         ScheduleCounter[gen] += 1
         if NbGen > 1
             ScheduleP[gen, ScheduleCounter[gen]] = MatchP[gen, 2:T+1]
             ScheduleU[gen, ScheduleCounter[gen]] = MatchU[gen, 2:T+1]
             ScheduleV[gen, ScheduleCounter[gen]] = MatchV[gen, 2:T+1]
             ScheduleW[gen, ScheduleCounter[gen]] = MatchW[gen, 2:T+1]
-            ScheduleCost[gen, ScheduleCounter[gen]] = sum(NoLoadConsumption[gen] * MarginalCost[gen] * MatchU[gen, t] + FixedCost[gen] * MatchV[gen, t] + MarginalCost[gen] * MatchP[gen, t] for t=2:T+1)
+            ScheduleCost[gen, ScheduleCounter[gen]] = sum(NoLoadConsumption[gen] * MatchU[gen, t] + FixedCost[gen] * MatchV[gen, t] + MarginalCost[gen] * MatchP[gen, t] for t=2:T+1)
         else
             ScheduleP[gen, ScheduleCounter[gen]] = MatchP[2:T+1]
             ScheduleU[gen, ScheduleCounter[gen]] = MatchU[2:T+1]
             ScheduleV[gen, ScheduleCounter[gen]] = MatchV[2:T+1]
             ScheduleW[gen, ScheduleCounter[gen]] = MatchW[2:T+1]
-            ScheduleCost[gen, ScheduleCounter[gen]] = sum(NoLoadConsumption[gen] * MarginalCost[gen] * MatchU[t] + FixedCost[gen] * MatchV[t] + MarginalCost[gen] * MatchP[t] for t=2:T+1)
+            ScheduleCost[gen, ScheduleCounter[gen]] = sum(NoLoadConsumption[gen] * MatchU[t] + FixedCost[gen] * MatchV[t] + MarginalCost[gen] * MatchP[t] for t=2:T+1)
         end
     
     end
@@ -293,7 +298,7 @@ function tColumnGeneration(instance, initial_prices, budget, eps, verbose = -1)
             @info "[CG: Iteration $iter]"
         end
         it_time = @elapsed begin
-        @objective(RMP.model, Min, sum(sum(DictZ[gen, i] * ScheduleCost[gen, i] for i=1:ScheduleCounter[gen]) for gen=1:NbGen) - LostLoad*sum(VarL[t] for t=1:T))
+        @objective(RMP.model, Min, sum(sum(DictZ[gen, i] * ScheduleCost[gen, i] for i=1:ScheduleCounter[gen]) for gen=1:NbGen) - LostLoad * sum(L[t] - VarL[t] for t=1:T))
         optimize!(RMP.model)
         ObjMaster = objective_value(RMP.model)
         push!(ObjVect, ObjMaster)
@@ -308,7 +313,7 @@ function tColumnGeneration(instance, initial_prices, budget, eps, verbose = -1)
         StoppingCriterion = 1
         for gen=1:NbGen
             SubProblem = table_subproblems[gen]
-            @objective(SubProblem.model, Min, sum(NoLoadConsumption[gen] * MarginalCost[gen] * SubProblem.Varu[t] + FixedCost[gen] * SubProblem.Varv[t] + MarginalCost[gen] * SubProblem.Varp[t] for t=1:T) - sum(price[t] * SubProblem.Varp[t] for t=1:T))
+            @objective(SubProblem.model, Min, sum(NoLoadConsumption[gen] * SubProblem.Varu[t] + FixedCost[gen] * SubProblem.Varv[t] + MarginalCost[gen] * SubProblem.Varp[t] for t=1:T) - sum(price[t] * SubProblem.Varp[t] for t=1:T))
             optimize!(SubProblem.model)
             termination_status(SubProblem.model)
             ReducedCost = objective_value(SubProblem.model) - PiDual[gen]
@@ -324,7 +329,7 @@ function tColumnGeneration(instance, initial_prices, budget, eps, verbose = -1)
                 ScheduleU[gen, ScheduleCounter[gen]] = SubP[2:T+1]
                 ScheduleV[gen, ScheduleCounter[gen]] = SubP[2:T+1]
                 ScheduleW[gen, ScheduleCounter[gen]] = SubP[2:T+1]
-                ScheduleCost[gen, ScheduleCounter[gen]] = sum(NoLoadConsumption[gen] * MarginalCost[gen] * SubU[t] + FixedCost[gen] * SubV[t] + MarginalCost[gen] * SubP[t] for t=2:T+1)
+                ScheduleCost[gen, ScheduleCounter[gen]] = sum(NoLoadConsumption[gen] * SubU[t] + FixedCost[gen] * SubV[t] + MarginalCost[gen] * SubP[t] for t=2:T+1)
 
                 NewVarZ = @variable(RMP.model, [[gen], [ScheduleCounter[gen]]], lower_bound = 0, upper_bound = 1, base_name = "Z")
                 RMP.VarZ[gen, ScheduleCounter[gen]] = NewVarZ[gen, ScheduleCounter[gen]]

@@ -1,6 +1,7 @@
 # Implementation of the Bundle Level Method (see Lemaréchal et al., 1995)
 using JuMP, ..Utilitaries, LinearAlgebra, Gurobi
-
+mPCD = -200.
+mPCU = 400.
 function BundleLevelMethod(instance, initial_prices, niter, alpha, verbose = -1)
     T = length(instance.Load)
     iterates = [initial_prices]
@@ -12,7 +13,7 @@ function BundleLevelMethod(instance, initial_prices, niter, alpha, verbose = -1)
     model_update_lb = JuMP.direct_model(Gurobi.Optimizer(GRB_ENV[]))
     set_silent(model_update_lb)
     set_optimizer_attributes(model_update_lb, "MIPGap" => 0, "MIPGapAbs" => 1e-8)
-    VarPrice = @variable(model_update_lb, [1:T], lower_bound = PCD, upper_bound = PCU)
+    VarPrice = @variable(model_update_lb, [1:T], lower_bound = mPCD, upper_bound = mPCU)
     Vart = @variable(model_update_lb)
     
     model_projection = JuMP.direct_model(Gurobi.Optimizer(GRB_ENV[]))
@@ -38,7 +39,7 @@ function BundleLevelMethod(instance, initial_prices, niter, alpha, verbose = -1)
 
         LevelSet = LowerBound + alpha * (UpperBound - LowerBound)
 
-        ProjPrice = @variable(model_projection, [1:T], lower_bound = PCD, upper_bound = PCU)
+        ProjPrice = @variable(model_projection, [1:T], lower_bound = mPCD, upper_bound = mPCU)
         @constraint(model_projection, fun_oracle + dot(grad_oracle, ProjPrice - iterates[i]) <= LevelSet)
         @objective(model_projection, Min, sum((ProjPrice[t] - iterates[i][t])^2 for t=1:T))
         optimize!(model_projection)
@@ -60,7 +61,7 @@ function tOptimal(instance, initial_prices, alpha, verbose = 1)
     set_silent(model_update_lb)
     set_optimizer_attributes(model_update_lb, "MIPGap" => 0, "MIPGapAbs" => 1e-8)
 
-    VarPrice = @variable(model_update_lb, [1:T], lower_bound = PCD, upper_bound = PCU)
+    VarPrice = @variable(model_update_lb, [1:T], lower_bound = mPCD, upper_bound = mPCU)
     Vart = @variable(model_update_lb)
     
     model_projection = JuMP.direct_model(Gurobi.Optimizer(GRB_ENV[]))
@@ -89,7 +90,7 @@ function tOptimal(instance, initial_prices, alpha, verbose = 1)
 
         LevelSet = LowerBound + alpha * (UpperBound - LowerBound)
 
-        ProjPrice = @variable(model_projection, [1:T], lower_bound = PCD, upper_bound = PCU)
+        ProjPrice = @variable(model_projection, [1:T], lower_bound = mPCD, upper_bound = mPCU)
         @constraint(model_projection, fun_oracle + dot(grad_oracle, ProjPrice - iterates[idx]) <= LevelSet)
         @objective(model_projection, Min, sum((ProjPrice[t] - iterates[idx][t])^2 for t=1:T))
         optimize!(model_projection)
@@ -112,14 +113,14 @@ function tBundleLevelMethod(instance, initial_prices, budget, alpha, verbose = -
 
     model_update_lb = JuMP.direct_model(Gurobi.Optimizer(GRB_ENV[]))
     set_silent(model_update_lb)
-    set_optimizer_attributes(model_update_lb, "MIPGap" => 0, "MIPGapAbs" => 1e-8)
+    set_optimizer_attributes(model_update_lb, "MIPGap" => 0, "MIPGapAbs" => 0)
 
-    VarPrice = @variable(model_update_lb, [1:T], lower_bound = PCD, upper_bound = PCU)
+    VarPrice = @variable(model_update_lb, [1:T], lower_bound = mPCD, upper_bound = mPCU)
     Vart = @variable(model_update_lb)
     
     model_projection = JuMP.direct_model(Gurobi.Optimizer(GRB_ENV[]))
     set_silent(model_projection)
-    set_optimizer_attributes(model_projection, "MIPGap" => 0, "MIPGapAbs" => 1e-8)
+    set_optimizer_attributes(model_projection, "MIPGap" => 0, "MIPGapAbs" => 0)
     UpperBounds = Float64[]
     LowerBounds = Float64[]
     time_vector = [0.]
@@ -144,7 +145,7 @@ function tBundleLevelMethod(instance, initial_prices, budget, alpha, verbose = -
 
         LevelSet = LowerBound + alpha * (UpperBound - LowerBound)
 
-        ProjPrice = @variable(model_projection, [1:T], lower_bound = PCD, upper_bound = PCU)
+        ProjPrice = @variable(model_projection, [1:T], lower_bound = mPCD, upper_bound = mPCU)
         @constraint(model_projection, fun_oracle + dot(grad_oracle, ProjPrice - iterates[idx]) <= LevelSet)
         @objective(model_projection, Min, sum((ProjPrice[t] - iterates[idx][t])^2 for t=1:T))
         optimize!(model_projection)

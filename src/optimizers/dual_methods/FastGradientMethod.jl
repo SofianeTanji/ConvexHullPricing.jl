@@ -74,7 +74,14 @@ function tShiftedFGM(instance, X0, τ, α, smoothing_parameter, verbose = -1)
         push!(time_vector, it_time + time_vector[end])
         t = t + 1
     end
-    return last(x_iterates), x_iterates, fun_iterates, time_vector
+    if verbose >= -1 # true
+        @info "[FGM: Done. Re-computing true function values.]"
+    end
+    f_iterates = Float64[]
+    for ρ in x_iterates
+        push!(f_iterates, Utilitaries.exact_oracle(instance, ρ)[1])
+    end
+    return last(x_iterates), x_iterates, f_iterates, time_vector
 end
 
 function tGM(instance, X0, τ, α, smoothing_parameter, verbose = -1)
