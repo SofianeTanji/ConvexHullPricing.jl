@@ -121,7 +121,7 @@ function ColumnGeneration(instance, initial_prices, niter, eps, verbose = -1)
         if verbose > 0
             @info "[CG: Iteration $iter]"
         end
-        @objective(RMP.model, Min, sum(sum(DictZ[gen, i] * ScheduleCost[gen, i] for i=1:ScheduleCounter[gen]) for gen=1:NbGen) - LostLoad * sum(L[t] - VarL[t] for t=1:T))
+        @objective(RMP.model, Min, sum(sum(DictZ[gen, i] * ScheduleCost[gen, i] for i=1:ScheduleCounter[gen]) for gen=1:NbGen) + LostLoad * sum(L[t] - VarL[t] for t=1:T))
         optimize!(RMP.model)
         ObjMaster = objective_value(RMP.model)
         push!(ObjVect, ObjMaster)
@@ -140,7 +140,7 @@ function ColumnGeneration(instance, initial_prices, niter, eps, verbose = -1)
             optimize!(SubProblem.model)
             termination_status(SubProblem.model)
             ReducedCost = objective_value(SubProblem.model) - PiDual[gen]
-            if ReducedCost <= eps
+            if ReducedCost <= -eps
                 StoppingCriterion = 0
                 SubP = value.(SubProblem.Varp).data
                 SubU = value.(SubProblem.Varu).data
@@ -167,7 +167,11 @@ function ColumnGeneration(instance, initial_prices, niter, eps, verbose = -1)
             break
         end
     end
-    return last(Iterates), Iterates
+    f_iterates = Float64[]
+    for ρ in Iterates
+        push!(f_iterates, Utilitaries.exact_oracle(instance, ρ)[1])
+    end
+    return last(Iterates), Iterates, f_iterates
 end
 
 function tColumnGeneration(instance, initial_prices, budget, eps, verbose = -1)
@@ -188,7 +192,7 @@ function tColumnGeneration(instance, initial_prices, budget, eps, verbose = -1)
     L = instance.Load
     T = length(L)
     LostLoad = instance.LostLoad
-
+    it_time = @elapsed begin
     # Build Subproblems
     price = initial_prices
     table_subproblems = Array{Utilitaries.SubProblem}(undef, NbGen)
@@ -291,14 +295,15 @@ function tColumnGeneration(instance, initial_prices, budget, eps, verbose = -1)
     ObjMaster = 0
     ObjVect = []
     Iterates = []
-    time_vector = [0.]
+    end
+    time_vector = [it_time]
     iter = 1
     while time_vector[end] <= budget
         if verbose > 0
             @info "[CG: Iteration $iter]"
         end
         it_time = @elapsed begin
-        @objective(RMP.model, Min, sum(sum(DictZ[gen, i] * ScheduleCost[gen, i] for i=1:ScheduleCounter[gen]) for gen=1:NbGen) - LostLoad * sum(L[t] - VarL[t] for t=1:T))
+        @objective(RMP.model, Min, sum(sum(DictZ[gen, i] * ScheduleCost[gen, i] for i=1:ScheduleCounter[gen]) for gen=1:NbGen) + LostLoad * sum(L[t] - VarL[t] for t=1:T))
         optimize!(RMP.model)
         ObjMaster = objective_value(RMP.model)
         push!(ObjVect, ObjMaster)
@@ -317,7 +322,7 @@ function tColumnGeneration(instance, initial_prices, budget, eps, verbose = -1)
             optimize!(SubProblem.model)
             termination_status(SubProblem.model)
             ReducedCost = objective_value(SubProblem.model) - PiDual[gen]
-            if ReducedCost < eps
+            if ReducedCost <= eps
                 StoppingCriterion = 0
                 SubP = value.(SubProblem.Varp).data
                 SubU = value.(SubProblem.Varu).data

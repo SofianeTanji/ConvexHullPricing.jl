@@ -190,13 +190,13 @@ end
 
 function RunDW()
   @info "Column Generation"
-  Xstar, Iterates, FunIterates, TimeVector = OPT.tColumnGeneration(BEinstances[1], zeros(96), 1., 1e-7)
+  Xstar, Iterates, FunIterates, TimeVector = OPT.tColumnGeneration(BEinstances[1], zeros(96), 5., 1e-7)
   @info "Compiled. Now starting."
   verb = 1
   for (idx, instance) in enumerate(BEinstances)
     @info "Instance BE #$idx - Running for 15 minutes."
     X0 = UT.LP_Relaxation(instance) # First iterate
-    α = 1e-7 # Parameter
+    α = 1e-5 # Parameter
     Xstar, Iterates, FunIterates, TimeVector = OPT.tColumnGeneration(instance, X0, BUDGET, α, verb)
     @info "Done. Saving ..."
     save_object("results//15min_runs//ColumnGeneration-BE$(idx).jld2", [Xstar, Iterates, FunIterates, TimeVector])
@@ -204,10 +204,33 @@ function RunDW()
   for (idx, instance) in enumerate(CAinstances)
     @info "Instance CA #$idx - Running for 15 minutes."
     X0 = UT.LP_Relaxation(instance) # First iterate
-    α = 1e-7 # Parameter
+    α = 1e-5 # Parameter
     Xstar, Iterates, FunIterates, TimeVector = OPT.tColumnGeneration(instance, X0, BUDGET, α, verb)
     @info "Done. Saving ..."
     save_object("results//15min_runs//ColumnGeneration-CA$(idx).jld2", [Xstar, Iterates, FunIterates, TimeVector])
+  end
+end
+
+function RunCRG()
+  @info "Column Row Generation"
+  Xstar, Iterates, FunIterates, TimeVector = OPT.tCRG(BEinstances[1], 5., 1e-5)
+  @info "Compiled. Now starting."
+  verb = 1
+  for (idx, instance) in enumerate(BEinstances)
+    @info "Instance BE #$idx - Running for 15 minutes."
+    # X0 = UT.LP_Relaxation(instance) # First iterate
+    α = 1e-5 # Parameter
+    Xstar, Iterates, FunIterates, TimeVector = OPT.tCRG(instance, BUDGET, α, verb)
+    @info "Done. Saving ..."
+    save_object("results//15min_runs//CRG-BE$(idx).jld2", [Xstar, Iterates, FunIterates, TimeVector])
+  end
+  for (idx, instance) in enumerate(CAinstances)
+    @info "Instance CA #$idx - Running for 15 minutes."
+    # X0 = UT.LP_Relaxation(instance) # First iterate
+    α = 1e-5 # Parameter
+    Xstar, Iterates, FunIterates, TimeVector = OPT.tCRG(instance, BUDGET, α, verb)
+    @info "Done. Saving ..."
+    save_object("results//15min_runs//CRG-CA$(idx).jld2", [Xstar, Iterates, FunIterates, TimeVector])
   end
 end
 

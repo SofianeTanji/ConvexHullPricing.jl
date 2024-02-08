@@ -207,7 +207,7 @@ function ExtendedFormulation(instance)
     # Optimize !
     optimize!(model)
 
-    return dual.(loads)
+    return shadow_price.(loads)
 end
 
 function LP_Relaxation(instance)
@@ -253,7 +253,7 @@ function LP_Relaxation(instance)
     @objective(model, Min, sum(sum(NoLoadConsumption[gen] * Varu[gen, t] + FixedCost[gen] * Varv[gen, t] + MarginalCost[gen] * Varp[gen, t] for t=1:T) for gen=1:NbGen) + LostLoad * sum(L[t] - VarL[t] for t=1:T))
     optimize!(model)
     
-    prices = dual.(loads) # prices = ProjBox(dual.(loads), PCD, PCU)
+    prices = shadow_price.(loads) # prices = ProjBox(dual.(loads), PCD, PCU)
     return prices
 end
 
