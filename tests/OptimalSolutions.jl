@@ -35,29 +35,32 @@ for (idx, instance) in enumerate(CAinstances)
 end
 =#
 function OptimalRTS()
-  RTS_GMLCinstances = []
-  for file in readdir("data//rts_gmlc"; join=true)
-    push!(RTS_GMLCinstances, UT.load_rts_data(file))
-  end
+    RTS_GMLCinstances = []
+    for file in readdir("data//rts_gmlc"; join = true)
+        push!(RTS_GMLCinstances, UT.load_rts_data(file))
+    end
 
-  for (idx, instance) in enumerate(RTS_GMLCinstances)
-    @info "Instance #$idx"
-    X0 = UT.LP_Relaxation(instance)
-    Xstar, Iterates, FunIterates, TimeVector = OPT.tOptimal(instance, X0, 0.4)
-    save_object("NewOptRunRTSGMLC$(idx).jld2", [Xstar, Iterates, FunIterates, TimeVector])
-  end
+    for (idx, instance) in enumerate(RTS_GMLCinstances)
+        @info "Instance #$idx"
+        X0 = UT.LP_Relaxation(instance)
+        Xstar, Iterates, FunIterates, TimeVector = OPT.tOptimal(instance, X0, 0.4)
+        save_object(
+            "NewOptRunRTSGMLC$(idx).jld2",
+            [Xstar, Iterates, FunIterates, TimeVector],
+        )
+    end
 end
 
 function OptimalFERC()
-  FERCinstances = []
-  for file in readdir("data//ferc"; join=true)
-    push!(FERCinstances, UT.load_ferc_data(file))
-  end
+    FERCinstances = []
+    for file in readdir("data//ferc"; join = true)
+        push!(FERCinstances, UT.load_ferc_data(file))
+    end
 
-  for (idx, instance) in enumerate(FERCinstances)
-    @info "Instance #$idx"
-    X0 = UT.LP_Relaxation(instance)
-    Xstar, Iterates, FunIterates, TimeVector = OPT.tOptimal(instance, X0, 0.4)
-    save_object("NewOptRunFERC$(idx).jld2", [Xstar, Iterates, FunIterates, TimeVector])
-  end
+    for (idx, instance) in enumerate(FERCinstances)
+        @info "Instance #$idx"
+        X0 = UT.LP_Relaxation(instance)
+        Xstar, Iterates, FunIterates, TimeVector = OPT.tOptimal(instance, X0, 0.4)
+        save_object("NewOptRunFERC$(idx).jld2", [Xstar, Iterates, FunIterates, TimeVector])
+    end
 end

@@ -1,6 +1,4 @@
 using ConvexHullPricing
 using Documenter, Literate
 
-makedocs(
-    sitename = "ConvexHullPricing",
-)
+makedocs(sitename = "ConvexHullPricing")
