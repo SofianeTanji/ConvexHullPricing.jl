@@ -348,9 +348,9 @@ function RunSSUBG()
     for (idx, instance) in enumerate(BEinstances)
         @info "Instance BE #$idx - Running for 15 minutes."
         X0 = UT.LP_Relaxation(instance) # First iterate
-        α = 100.0 # Parameter
+        α = 5e3 # Parameter
         Xstar, Iterates, FunIterates, TimeVector =
-            OPT.tnStochasticSubgradientMethod(instance, X0, BUDGET, α, 8)
+            OPT.tnStochasticSubgradientMethod(instance, X0, BUDGET, α, 20)
         @info "Done. Saving ..."
         save_object(
             "results//15min_runs//StochasticSubGBE$(idx).jld2",
@@ -360,9 +360,9 @@ function RunSSUBG()
     for (idx, instance) in enumerate(CAinstances)
         @info "Instance CA #$idx - Running for 15 minutes."
         X0 = UT.LP_Relaxation(instance) # First iterate
-        α = 0.3 # Parameter
+        α = 100.0 # Parameter
         Xstar, Iterates, FunIterates, TimeVector =
-            OPT.tnStochasticSubgradientMethod(instance, X0, BUDGET, α, 10)
+            OPT.tnStochasticSubgradientMethod(instance, X0, BUDGET, α, 180)
         @info "Done. Saving ..."
         save_object(
             "results//15min_runs//StochasticSubGCA$(idx).jld2",
