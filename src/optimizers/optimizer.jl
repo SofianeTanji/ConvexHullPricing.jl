@@ -18,6 +18,7 @@ include("dual_methods/DoWG.jl")
 include("dual_methods/FastGradientMethod.jl")
 include("dual_methods/PolyakMethod.jl")
 include("dual_methods/SubgradientMethod.jl")
+include("dual_methods/StochasticMethods.jl")
 
 include("primal_methods/ColumnAndRowGeneration.jl")
 include("primal_methods/ColumnGeneration.jl")

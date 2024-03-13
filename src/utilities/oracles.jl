@@ -861,7 +861,7 @@ function stochastic_oracle(instance, prices, batchsize)
         Valp = value.(model[:Varp])
         GradOracle += Array([ValL[t] / NbGen - Valp[t] for t = 1:T])
     end
-    return ObjOracle, GradOracle
+    return ObjOracle, GradOracle, indexes
 end
 
 function exact_smooth_oracle(instance, prices, smoothing_parameter)
@@ -1072,4 +1072,109 @@ function exact_translate_smooth_oracle(instance, prices, smoothing_parameter, sh
         GradOracle += transpose(A) * U# Array([ValL[t]/NbGen - Valp[t] for t=1:T])
     end
     return ObjOracle, -GradOracle
+end
+
+function smooth_stochastic_oracle(instance, prices, smoothing_parameter, batchsize)
+    MinRunCapacity = instance.ThermalGen.MinRunCapacity
+    MaxRunCapacity = instance.ThermalGen.MaxRunCapacity
+    RampUp = instance.ThermalGen.RampUp
+    RampDown = instance.ThermalGen.RampDown
+    UpTime = instance.ThermalGen.UpTime
+    DownTime = instance.ThermalGen.DownTime
+    StartUp = instance.ThermalGen.StartUp
+    ShutDown = instance.ThermalGen.ShutDown
+    NbGen = length(MinRunCapacity)
+    FixedCost = instance.ThermalGen.FixedCost
+    MarginalCost = instance.ThermalGen.MarginalCost
+    NoLoadConsumption = instance.ThermalGen.NoLoadConsumption
+    L = instance.Load
+    T = length(L)
+    LostLoad = instance.LostLoad
+
+    ObjOracle = 0
+    GradOracle = zeros(T)
+    indexes = randperm(NbGen)[1:batchsize]
+    A = [Matrix(1.0I, T, T); zeros(Float64, 4 * T, T); Matrix((-1 / NbGen)I, T, T)]
+    generators = [k for k = 1:NbGen]
+    for gen in generators[indexes]
+        model = JuMP.direct_model(Gurobi.Optimizer(GRB_ENV[]))
+        set_silent(model)
+        set_optimizer_attributes(model, "MIPGap" => 0, "MIPGapAbs" => 1e-8)
+
+        @variable(model, Varp[t = 0:T+1], lower_bound = 0)
+        @variable(model, Varpbar[t = 0:T+1], lower_bound = 0)
+        @variable(model, Varu[t = 0:T+1], Bin)
+        @variable(model, Varv[t = 0:T+1], Bin)
+        @variable(model, Varw[t = 0:T+1], Bin)
+
+        @variable(model, VarL[t = 1:T], lower_bound = 0)
+        @constraint(model, [t = 1:T], VarL[t] <= L[t])
+
+        @constraint(
+            model,
+            ConstrLogical[t = 1:T+1],
+            Varu[t] - Varu[t-1] == Varv[t] - Varw[t]
+        )
+        @constraint(model, ConstrGenLimits2[t = 0:T+1], Varp[t] <= Varpbar[t])
+
+        @constraint(
+            model,
+            ConstrMinUpTime[t = UpTime[gen]:T+1],
+            sum(Varv[i] for i = t-UpTime[gen]+1:t) <= Varu[t]
+        )
+        @constraint(
+            model,
+            ConstrMinDownTime[t = DownTime[gen]:T+1],
+            sum(Varw[i] for i = t-DownTime[gen]+1:t) <= (1 - Varu[t])
+        )
+        @constraint(
+            model,
+            ConstrGenLimits1[t = 0:T+1],
+            MinRunCapacity[gen] * Varu[t] <= Varp[t]
+        )
+        @constraint(
+            model,
+            ConstrGenLimits3[t = 0:T+1],
+            Varpbar[t] <= MaxRunCapacity[gen] * Varu[t]
+        )
+        @constraint(
+            model,
+            ConstrRampUp[t = 1:T+1],
+            Varpbar[t] - Varp[t-1] <= RampUp[gen] * Varu[t-1] + StartUp[gen] * Varv[t]
+        )
+        @constraint(
+            model,
+            ConstrRampDown[t = 1:T+1],
+            Varpbar[t-1] - Varp[t] <= RampDown[gen] * Varu[t] + ShutDown[gen] * Varw[t]
+        )
+
+        prox = sum(
+            Varp[t]^2 + Varpbar[t]^2 + Varu[t]^2 + Varv[t]^2 + Varw[t]^2 + VarL[t]^2 for
+            t = 1:T
+        )
+        @objective(
+            model,
+            Min,
+            sum(
+                NoLoadConsumption[gen] * Varu[t] +
+                FixedCost[gen] * Varv[t] +
+                MarginalCost[gen] * Varp[t] +
+                (LostLoad / NbGen) * (L[t] - VarL[t]) -
+                prices[t] * (Varp[t] - (VarL[t] / NbGen)) +
+                (smoothing_parameter / 2) * prox for t = 1:T
+            )
+        )
+        optimize!(model)
+
+        ObjOracle += objective_value(model)
+        ValL = value.(model[:VarL])[1:T]
+        Valp = value.(model[:Varp]).data[2:T+1]
+        Valpbar = value.(model[:Varpbar]).data[2:T+1]
+        Valu = value.(model[:Varu]).data[2:T+1]
+        Valv = value.(model[:Varv]).data[2:T+1]
+        Valw = value.(model[:Varw]).data[2:T+1]
+        U = vcat(Valp, Valpbar, Valu, Valv, Valw, ValL)
+        GradOracle += transpose(A) * U
+    end
+    return ObjOracle, GradOracle, indexes
 end

@@ -2,6 +2,7 @@
 using JuMP, ..Utilitaries, LinearAlgebra, Gurobi
 mPCD = -200.0
 mPCU = 400.0
+
 function BundleLevelMethod(instance, initial_prices, niter, alpha, verbose = -1)
     T = length(instance.Load)
     iterates = [initial_prices]
@@ -128,7 +129,6 @@ function tOptimal(instance, initial_prices, alpha, verbose = 1)
     @info "UB = $(UpperBound), LB = $(LowerBound), UB-LB = $(UpperBound - LowerBound)"
     return last(iterates), iterates, fun_iterates, time_vector
 end
-
 
 function tBundleLevelMethod(instance, initial_prices, budget, alpha, verbose = -1)
     T = length(instance.Load)
