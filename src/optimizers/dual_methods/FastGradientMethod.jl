@@ -1,10 +1,10 @@
 # Implementation of the Optimized Gradient Method (see Kim et al., 2016)
 using ..Utilitaries, LinearAlgebra
 
-function FastGradientMethod(instance, X0, niter, smoothing_parameter, verbose = -1)
+function FastGradientMethod(instance, X0, niter, γ, smoothing_parameter, verbose = -1)
     T = length(instance.Load)
     NbGen = length(instance.ThermalGen.MinRunCapacity)
-    Lips = ((1 + 1 / (NbGen^2)) * T) / smoothing_parameter
+    Lips = γ
     x_iterates = [X0]
     y_iterates = [X0]
     fun_iterates = Array([])
