@@ -21,6 +21,28 @@ function SubgradientMethod(instance, initial_prices, niter, alpha, verbose = -1)
     x_best = iterates[argmax(fun_iterates)]
     return x_best, iterates, fun_iterates
 end
+
+function sSM(instance, initial_prices, niter, alpha, idx, verbose = -1)
+    iterates = [initial_prices]
+    fun_iterates = Array([])
+
+    for i = 1:niter
+        if verbose > 0
+            @info "[SubG: Iteration $i]"
+        end
+        fun_oracle, grad_oracle = Utilitaries.soracle(instance, iterates[i], idx)
+        push!(fun_iterates, fun_oracle)
+        fun_oracle, grad_oracle = -fun_oracle, -grad_oracle # Maximizing a concave function <=> Minimizing a convex function
+
+        push!(
+            iterates,
+            Utilitaries.ProjBox(iterates[i] - (alpha / (i)) * grad_oracle, PCD, PCU),
+        )
+    end
+    x_best = iterates[argmax(fun_iterates)]
+    return x_best, iterates, fun_iterates
+end
+
 function StochasticSubgradientMethod(
     instance,
     initial_prices,
