@@ -470,7 +470,7 @@ function LP_Relaxation(instance)
     )
     optimize!(model)
 
-    prices = shadow_price.(loads) # prices = ProjBox(dual.(loads), PCD, PCU)
+    prices = dual.(loads) # prices = ProjBox(dual.(loads), PCD, PCU)
     return prices
 end
 
@@ -1176,9 +1176,8 @@ function smooth_stochastic_oracle(instance, prices, smoothing_parameter, batchsi
         U = vcat(Valp, Valpbar, Valu, Valv, Valw, ValL)
         GradOracle += transpose(A) * U
     end
-    return ObjOracle, GradOracle, indexes
+    return ObjOracle, -GradOracle, indexes
 end
-
 
 function soracle(instance, prices, indexes)
     MinRunCapacity = instance.ThermalGen.MinRunCapacity

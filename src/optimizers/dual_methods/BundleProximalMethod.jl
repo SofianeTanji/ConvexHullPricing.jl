@@ -367,6 +367,101 @@ function tBPLM(instance, initial_prices, τ, α, verbose = -1)
         push!(time_vector, it_time + time_vector[end])
         i = i + 1
     end
-    @info "UB = $(UpperBound), LB = $(LowerBound), UB-LB = $(UpperBound - LowerBound)"
+    # @info "UB = $(UpperBound), LB = $(LowerBound), UB-LB = $(UpperBound - LowerBound)"
     return last(iterates), iterates, fun_iterates, time_vector
 end
+
+function tSmoothBPLM(instance, initial_prices, τ, α, μ, verbose = -1)
+
+    T = length(instance.Load)
+    iterates = [initial_prices]
+    fun_iterates = Array([])
+    shift = Utilitaries.GetShift(instance)
+  
+    UpperBound, LowerBound = Inf, -Inf
+  
+    model_update_lb = JuMP.direct_model(Gurobi.Optimizer(GRB_ENV[]))
+    set_silent(model_update_lb)
+    set_optimizer_attributes(model_update_lb, "MIPGap" => 0, "MIPGapAbs" => 1e-8)
+  
+  
+    VarPrice = @variable(model_update_lb, [1:T], lower_bound = mPCD, upper_bound = mPCU)
+    Vart = @variable(model_update_lb)
+  
+    model_projection = JuMP.direct_model(Gurobi.Optimizer(GRB_ENV[]))
+    set_silent(model_projection)
+    set_optimizer_attributes(model_projection, "MIPGap" => 0, "MIPGapAbs" => 1e-8)
+  
+    newGap = Inf
+    newLevel = Inf
+    BestPoint = initial_prices
+    prevFunVal = Inf
+  
+    time_vector = [0.0]
+    i = 1
+    while time_vector[end] <= τ
+        if verbose > 0
+            @info "[BPLM: Iteration $(i) ; UB = $(UpperBound), LB = $(LowerBound), UB-LB = $(UpperBound - LowerBound)]"
+        end
+        it_time = @elapsed begin
+            fun_oracle, grad_oracle = Utilitaries.exact_translate_smooth_oracle(instance, iterates[i], μ, shift)
+            push!(fun_iterates, fun_oracle)
+            fun_oracle, grad_oracle = -fun_oracle, -grad_oracle # Maximizing a concave function <=> Minimizing a convex function
+  
+            if fun_oracle < prevFunVal
+                BestPoint = iterates[i]
+            end
+  
+            if UpperBound > fun_oracle
+                UpperBound = fun_oracle
+            end
+  
+            @constraint(
+                model_update_lb,
+                fun_oracle + dot(grad_oracle, VarPrice - iterates[i]) <= Vart
+            )
+            @objective(model_update_lb, Min, Vart)
+            optimize!(model_update_lb)
+  
+            LowerBound = objective_value(model_update_lb)
+  
+            LevelSet = LowerBound + α * (UpperBound - LowerBound)
+  
+            if UpperBound - LowerBound >= (1 - α) * newGap
+                newLevel = minimum([LevelSet, newLevel])
+            else
+                newLevel = LevelSet
+                newGap = UpperBound - LowerBound
+            end
+  
+            ProjPrice = @variable(
+                model_projection,
+                [1:T],
+                lower_bound = mPCD,
+                upper_bound = mPCU
+            )
+            @constraint(
+                model_projection,
+                fun_oracle + dot(grad_oracle, ProjPrice - iterates[i]) <= newLevel
+            )
+            @objective(
+                model_projection,
+                Min,
+                sum((ProjPrice[t] - iterates[i][t])^2 for t = 1:T)
+            )
+            optimize!(model_projection)
+            push!(iterates, value.(ProjPrice))
+            prevFunVal = fun_oracle
+        end
+        push!(time_vector, it_time + time_vector[end])
+        i = i + 1
+    end
+    # Get true values of the oracle
+    f_iterates = Float64[]
+    for ρ in iterates
+            push!(f_iterates, Utilitaries.exact_oracle(instance, ρ)[1])
+    end
+    # @info "UB = $(UpperBound), LB = $(LowerBound), UB-LB = $(UpperBound - LowerBound)"
+    return last(iterates), iterates, f_iterates, time_vector
+  end
+  

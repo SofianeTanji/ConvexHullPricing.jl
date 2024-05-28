@@ -251,6 +251,32 @@ function RunBPLM_L()
     end
 end
 
+function RunBPLM_L_S()
+    @info "Bundle Proximal Level Method - Last Iterate - Smooth"
+    for (idx, instance) in enumerate(BEinstances)
+        @info "Instance BE #$idx - Running for 15 minutes."
+        X0 = UT.LP_Relaxation(instance) # First iterate
+        α = 0.75 # Parameter
+        Xstar, Iterates, FunIterates, TimeVector = OPT.tSmoothBPLM(instance, X0, BUDGET, α, 1e-8)
+        @info "Done. Saving ..."
+        save_object(
+            "results//15min_runs//BundleProximalLevelMethod-L-S-BE$(idx).jld2",
+            [Xstar, Iterates, FunIterates, TimeVector],
+        )
+    end
+    #= for (idx, instance) in enumerate(CAinstances)
+        @info "Instance CA #$idx - Running for 15 minutes."
+        X0 = UT.LP_Relaxation(instance) # First iterate
+        α = 0.9 # Parameter
+        Xstar, Iterates, FunIterates, TimeVector = OPT.tSmoothBPLM(instance, X0, BUDGET, α, 1e-8)
+        @info "Done. Saving ..."
+        save_object(
+            "results//15min_runs//BundleProximalLevelMethod-L-S-CA$(idx).jld2",
+            [Xstar, Iterates, FunIterates, TimeVector],
+        )
+    end =#
+end
+
 function RunDW()
     @info "Column Generation"
     Xstar, Iterates, FunIterates, TimeVector =
