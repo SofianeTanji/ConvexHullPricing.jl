@@ -10,16 +10,10 @@ The current version is still in the making. The proposed solvers are:
    - Bundle Level Method
     > N. Stevens and A. Papavasiliou, “Application of the level method for computing locational convex hull prices,” IEEE Transactions on Power Systems, (2022)
     > C. Lemaréchal, A. Nemirovskii, and Y. Nesterov, New variants of bundle methods, Math.Program., (1995)
-   - Bundle Proximal Method
-    > W. de Oliveira, C. A. Sagastizabal, and C. Lemaréchal, Convex proximal bundle methods in depth: A unified analysis for inexact oracles, Math. Program., (2014)
-   - Doubly Stabilized Bundle Method
-    > W. de Oliveira, M. Solodov, A doubly stabilized bundle method for nonsmooth convex optimization. Math. Program., (2016)
    - D-Adaptation
     > A. Defazio, K. Mishchenko, Learning-rate-free learning by D-adaptation. arXiv preprint arXiv:2301.07733, (2023)
    - DowG
     > A. Khaled, K. Mishchenko, C. Jin, DoWG Unleashed: An Efficient Universal Parameter-Free Gradient Descent Method, arXiv preprint arXiv:2305.16284, (2023)
-   - Optimized Gradient Method
-    > D. Kim, J.A. Fessler, Optimized first-order methods for smooth convex minimization. Math. Program., (2016)
    - Polyak Subgradient Method
     > B. Polyak, Gradient methods for the minimisation of functionals. USSR Computational Mathematics and Mathematical Physics, (1963)
    - Subgradient Method
